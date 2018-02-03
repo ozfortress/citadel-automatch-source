@@ -1,0 +1,4 @@
+"Citadel-AutoMatch Plugin"
+{
+    "file"      "addons/citadel-automatch.so"
+}
