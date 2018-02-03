@@ -1,4 +1,5 @@
 language: cpp
+
 compiler:
   - clang
   - gcc
@@ -18,3 +19,7 @@ before_install:
 script:
   - cmake . -DSOURCE_SDK_DIR=source-sdk-2013/mp/src
   - make all install
+
+notifications:
+  slack:
+    secure: Twa5PXQ5YQFXSl8/ZiRUF6f58lTsMBCVU9PC8yPr/A3/Q4Wy9QUmOLI6TJFo2kEBH8nv2g5lA2W4XZAcPKKJ/f8bRQ1HZBhyi2OrI2mlaLumsRgpmliHSnpRSUS0ZB8CEF5MiJb+hEdMr83cJAdFUyd3BJVw27XDkvF446LIoxkQY5jTPcaAVjV2OkDiCuD0JITTe2BYsAAbkxKVhekkp4jP/V9nZ4tUzosi2OiZ8+/i49b/IErNrrKEoVwBfcPGeMSnPONK7d64KNVVMJN8vj7orYShdImgo7MqIKLGTpcSUNpmpdD7u3vQTp+tJgFiOmq/ECiWvX5uudR3+buRIn0qoHGsgjAX92l8r0bY2dhW6W57WgIgNypzH4cAZQVdj9i+E8XavHqOOv960kttkamxxmtLA6FkqQNulHW1pI1hXVFk+eBa0F7QmzQah2a7Vpdo/QDYmNFvNv4VRhuZdRVzaaonrmI0KGqCFqQMbilrUNn5MqBsq9Z92B46vQRRlXVGz/aZTTRQsYBjzw+Rk2yJ2G+AEyzAn6X+hg8+igRyP8F51rOLv1r1VKOc298X5DZKD8W5soaGXx51QiPV2GTVjEAlgoiRQ6etaH4PZIc/uxZ+rRQJuG31P+DDwtEqtaHdRolTZ9yKvBPVI95p+PT2AFllNFVnblTQaWMt0S8=
