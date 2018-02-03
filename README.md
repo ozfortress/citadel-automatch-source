@@ -1,4 +1,4 @@
-# Citadel-AutoMatch for Source Engine
+# Citadel-AutoMatch for the Source Engine
 
 ## Dependencies
 
