@@ -1,4 +1,4 @@
-"Citadel-AutoMatch Plugin"
+Plugin
 {
-    "file"      "addons/citadel-automatch.so"
+    file "addons/citadel-automatch.so"
 }

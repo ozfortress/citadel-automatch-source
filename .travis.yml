@@ -18,7 +18,7 @@ before_install:
 
 script:
   - cmake . -DSOURCE_SDK_DIR=source-sdk-2013/mp/src
-  - make all install
+  - make CTEST_OUTPUT_ON_FAILURE=1 all test install
 
 notifications:
   slack:

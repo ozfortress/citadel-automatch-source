@@ -53,3 +53,4 @@ build
 # Build artifacts
 build/
 install/
+vendor/
