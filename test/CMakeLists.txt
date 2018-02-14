@@ -23,10 +23,10 @@ add_library(libcatch INTERFACE)
 target_include_directories(libcatch INTERFACE ${CATCH_INCLUDE_DIR})
 
 # Include this project's header files
-include_directories(${CMAKE_BINARY_DIR}/include)
+include_directories(${CMAKE_BINARY_DIR}/include ${CMAKE_BINARY_DIR}/test)
 
 # Make test executable
-file(GLOB TEST_SOURCES "*.cpp")
+file(GLOB_RECURSE TEST_SOURCES "*.cpp")
 add_executable(tests ${TEST_SOURCES})
 target_link_libraries(tests libcatch citadel-automatch dl)
 

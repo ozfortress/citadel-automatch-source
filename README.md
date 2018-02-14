@@ -9,7 +9,7 @@
 ### Ubuntu Dependency Installation
 
 ```bash
-sudo apt install build-essential cmake libc6-dev-i386 gcc-multilib g++-multilib
+sudo apt install build-essential cmake libc6-dev-i386 gcc-multilib g++-multilib libcurl4-openssl-dev:i386
 ```
 
 ## Building

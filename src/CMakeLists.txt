@@ -29,6 +29,8 @@ include_directories(
     "${SOURCE_SDK_DIR}/game/server"
 )
 
+set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS OFF)
+
 # Platform specific settings
 if(UNIX)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=pentium4 -m32 -std=c++11")
@@ -74,6 +76,8 @@ if(UNIX)
             ${tier2_LIB}
             ${tier3_LIB}
             ${mathlib_LIB}
+            pthread
+            curl
         )
     endif()
 
