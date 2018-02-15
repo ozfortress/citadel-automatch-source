@@ -11,6 +11,7 @@ addons:
       - libc6-dev-i386
       - gcc-multilib
       - g++-multilib
+      - libcurl4-openssl-dev:i386
 
 before_install:
   # Fetch source sdk
