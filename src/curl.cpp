@@ -48,7 +48,7 @@ static inline std::string curlMultiErrorMessage(CURLMcode errorCode) {
 }
 
 static inline std::string curlEasyErrorMessage(CURLcode errorCode) {
-    return format("CURL: Unknown easy curl error code '%s'", errorCode);
+    return format("CURL: Unknown easy curl error code '%d'", errorCode);
 }
 
 static void curlThread() {
