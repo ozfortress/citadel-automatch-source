@@ -16,19 +16,20 @@ public:
     };
 
 private:
-    State state;
+    State state = State::initializing;
+
     std::vector<std::string> logs;
 
     std::shared_ptr<IGame> game;
     std::shared_ptr<citadel::IClient> citadel;
-
-public:
-
-    Match(std::shared_ptr<IGame>, std::shared_ptr<citadel::IClient>);
-    ~Match();
+    uint64_t matchId;
 
     void log(std::string);
     std::string getLogs();
 
-    void start(SteamID initiator);
+public:
+    Match(std::shared_ptr<IGame>, std::shared_ptr<citadel::IClient>, uint64_t matchId);
+    ~Match();
+
+    void start();
 };

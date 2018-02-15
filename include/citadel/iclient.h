@@ -21,21 +21,25 @@ namespace citadel {
 
     class IClient {
     public:
-        template<class ... Types>
+        template<class Result>
         class Callback {
-            void onResult(Types ... args);
-            void onError(int32_t code, std::string error);
+        public:
+            virtual void onResult(std::unique_ptr<Result>) = 0;
+            virtual void onError(int32_t code, std::string error) = 0;
         };
 
-        virtual void findMatchForPlayers(Callback<std::vector<Match>>, SteamID invokerSteamID, std::vector<SteamID> playerSteamIDs) = 0;
+        struct MatchForPlayersResponse {
+            std::vector<Match> matches;
+        };
+
+        virtual void findMatchForPlayers(std::unique_ptr<Callback<MatchForPlayersResponse>>, SteamID invokerSteamID, std::vector<SteamID> playerSteamIDs) = 0;
 
         struct RegisterPluginResponse {
             std::string registrationToken;
             std::string confirmationURL;
-            std::string matchRegistrationURL;
         };
 
-        virtual void registerPlugin(Callback<RegisterPluginResponse>, uint64_t matchId) = 0;
+        virtual void registerPlugin(std::unique_ptr<Callback<RegisterPluginResponse>>, uint64_t matchId, std::string address, std::string password, std::string rconPassword, std::vector<SteamID> team1, std::vector<SteamID> team2) = 0;
 
         struct RegisterMatchResponse {
             enum class State {
@@ -48,7 +52,7 @@ namespace citadel {
             std::string matchToken;
         };
 
-        virtual void registerMatch(Callback<RegisterMatchResponse>, uint64_t matchId, std::string registrationToken) = 0;
+        virtual void registerMatch(std::unique_ptr<Callback<RegisterMatchResponse>>, uint64_t matchId, std::string registrationToken) = 0;
 
 
         struct MatchResult {
@@ -57,6 +61,6 @@ namespace citadel {
             std::string pluginLogs;
         };
 
-        virtual void submitMatch(Callback<>, uint64_t matchId, std::string matchToken, MatchResult result) = 0;
+        virtual void submitMatch(std::unique_ptr<Callback<void>>, uint64_t matchId, std::string matchToken, MatchResult result) = 0;
     };
 }
