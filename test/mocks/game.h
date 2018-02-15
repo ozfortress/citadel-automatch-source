@@ -16,5 +16,8 @@ namespace mocks {
         std::string serverRConPassword() override;
         std::vector<SteamID> team1Players() override;
         std::vector<SteamID> team2Players() override;
+
+        void notifyError(std::string message, SteamID target) override;
+        void resetMatch() override;
     };
 }

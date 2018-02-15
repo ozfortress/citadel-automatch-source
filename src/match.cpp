@@ -3,6 +3,8 @@
 #include <sstream>
 #include <iterator>
 
+#include "utils.h"
+
 template<class ... Types>
 struct CitadelCallback : citadel::IClient::Callback<Types ...> {
     Match& match;
@@ -29,6 +31,8 @@ std::string Match::getLogs() {
 }
 
 void Match::start() {
+    state = State::initializing;
+
     struct Callback : public CitadelCallback<citadel::IClient::RegisterPluginResponse> {
         explicit Callback(Match& match) : CitadelCallback(match) {}
 
@@ -37,7 +41,8 @@ void Match::start() {
         }
 
         void onError(int32_t code, std::string error) override {
-
+            match.game->notifyError(format("Failed to register plugin for match. Got error %d with message '%s'", code, error.c_str()));
+            match.game->resetMatch();
         }
     };
 

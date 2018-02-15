@@ -23,3 +23,8 @@ std::vector<SteamID> mocks::Game::team1Players() {
 std::vector<SteamID> mocks::Game::team2Players() {
     return team2;
 }
+
+void mocks::Game::notifyError(std::string message, SteamID target) {}
+
+void mocks::Game::resetMatch() {}
+

@@ -12,4 +12,7 @@ public:
     virtual std::string serverRConPassword() = 0;
     virtual std::vector<SteamID> team1Players() = 0;
     virtual std::vector<SteamID> team2Players() = 0;
+
+    virtual void notifyError(std::string message, SteamID target = SteamID(0)) = 0;
+    virtual void resetMatch() = 0;
 };

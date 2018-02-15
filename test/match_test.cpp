@@ -8,8 +8,7 @@
 
 TEST_CASE("Match::start") {
     SECTION("works normally") {
-        class CitadelClient : public mocks::CitadelClient {
-        public:
+        struct CitadelClient : public mocks::CitadelClient {
             int calls = 0;
 
             void registerPlugin(std::unique_ptr<Callback<RegisterPluginResponse>> callback, uint64_t matchId, std::string address, std::string password, std::string rconPassword, std::vector<SteamID> team1, std::vector<SteamID> team2) override {
@@ -33,15 +32,39 @@ TEST_CASE("Match::start") {
 
         REQUIRE(citadel->calls == 1);
     }
+
+    SECTION("resets match on request error") {
+        struct Game : public mocks::Game {
+            int notifyErrorCalls = 0;
+            int resetMatchCalls = 0;
+
+            void notifyError(std::string message, SteamID target) override {
+                notifyErrorCalls++;
+                REQUIRE(target == SteamID(0)); // It should notify everyone
+                // TODO: Require something about the message
+            }
+
+            void resetMatch() override {
+                resetMatchCalls++;
+            }
+        };
+
+        struct CitadelClient : public mocks::CitadelClient {
+            int calls = 0;
+
+            void registerPlugin(std::unique_ptr<Callback<RegisterPluginResponse>> callback, uint64_t matchId, std::string address, std::string password, std::string rconPassword, std::vector<SteamID> team1, std::vector<SteamID> team2) override {
+                callback->onError(500, "Internal Server Error");
+                calls++;
+            }
+        };
+
+        std::shared_ptr<CitadelClient> citadel(new CitadelClient());
+        std::shared_ptr<Game> game(new Game());
+        std::unique_ptr<Match> match(new Match(game, citadel, 34));
+        match->start();
+
+        REQUIRE(citadel->calls == 1);
+        REQUIRE(game->notifyErrorCalls == 1);
+        REQUIRE(game->resetMatchCalls == 1);
+    }
 }
-
-// TEST_CASE( "Factorials are computed", "[factorial]" ) {
-//     std::shared_ptr<citadel::IClient> citadel(new mocks::CitadelClient());
-//     std::shared_ptr<IGame> game(new mocks::Game());
-//     Match match(game, citadel, 1);
-
-//     match.log("Foo");
-//     match.log("Bar");
-
-//     REQUIRE(match.getLogs() == "Foo\nBar\n");
-// }
