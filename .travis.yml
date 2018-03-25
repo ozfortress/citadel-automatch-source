@@ -1,24 +1,39 @@
 language: cpp
 
-compiler:
-  - clang
-  - gcc
+matrix:
+  include:
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - ubuntu-toolchain-r-test
+
+          packages:
+            - g++-7-multilib
+
+      env:
+        - CC=gcc-7
+        - CXX=g++-7
+
+    - os: linux
+      addons:
+        apt:
+          sources:
+            - llvm-toolchain-trusty-5.0
+
+          packages:
+            - clang-5.0
+
+      env:
+        - CC=clang-5.0
+        - CXX=clang++-5.0
 
 addons:
   apt:
-    sources:
-      - ubuntu-toolchain-r-test
-
     packages:
       - cmake
       - libc6-dev-i386
-      - gcc-7-multilib
-      - g++-7-multilib
       - libcurl4-openssl-dev:i386
-
-env:
-  - CC=gcc-7
-  - CXX=g++-7
 
 before_install:
   # Fetch source sdk
