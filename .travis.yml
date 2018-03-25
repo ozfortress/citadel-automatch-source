@@ -10,7 +10,8 @@ matrix:
 
           packages:
             - g++-7-multilib
-
+            - libc6-dev-i386
+            - libcurl4-openssl-dev:i386
       env:
         - CC=gcc-7
         - CXX=g++-7
@@ -23,17 +24,11 @@ matrix:
 
           packages:
             - clang-5.0
-
+            - libc6-dev-i386
+            - libcurl4-openssl-dev:i386
       env:
         - CC=clang-5.0
         - CXX=clang++-5.0
-
-addons:
-  apt:
-    packages:
-      - cmake
-      - libc6-dev-i386
-      - libcurl4-openssl-dev:i386
 
 before_install:
   # Fetch source sdk
