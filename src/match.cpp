@@ -32,7 +32,7 @@ std::string Match::getLogs() {
 }
 
 void Match::start() {
-    state = State::initializing;
+    state = Initializing();
 
     struct Callback : public CitadelCallback<citadel::IClient::RegisterPluginResponse> {
         explicit Callback(Match& match) : CitadelCallback(match) {}
