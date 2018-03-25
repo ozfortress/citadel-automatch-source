@@ -54,7 +54,6 @@ namespace citadel {
 
         virtual void registerMatch(std::unique_ptr<Callback<RegisterMatchResponse>>, uint64_t matchId, std::string registrationToken) = 0;
 
-
         struct MatchResult {
             double homeTeamScore;
             double awayTeamScore;

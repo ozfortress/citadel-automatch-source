@@ -15,4 +15,12 @@ public:
 
     virtual void notifyError(std::string message, SteamID target = SteamID(0)) = 0;
     virtual void resetMatch() = 0;
+
+    virtual void notifyAll(std::string) = 0;
+    virtual void notify(SteamID, std::string) = 0;
+};
+
+enum class Team {
+    team1 = 0,
+    team2 = 1,
 };

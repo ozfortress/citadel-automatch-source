@@ -1,4 +1,5 @@
 #include "match.h"
+#include "utils.h"
 
 #include <sstream>
 #include <iterator>
@@ -37,7 +38,9 @@ void Match::start() {
         explicit Callback(Match& match) : CitadelCallback(match) {}
 
         void onResult(std::unique_ptr<citadel::IClient::RegisterPluginResponse> response) override {
-            match.state = State::waitingForConfirmation;
+            match.state = ConfirmationPending();
+
+            match.game->notifyAll("Plugin registered. Can one player of each team please type '!confirm' to confirm the rosters.");
         }
 
         void onError(int32_t code, std::string error) override {
@@ -45,8 +48,8 @@ void Match::start() {
             match.game->resetMatch();
         }
     };
-
     std::unique_ptr<Callback> callback(new Callback(*this));
+
     citadel->registerPlugin(
         std::move(callback),
         matchId,
@@ -56,4 +59,28 @@ void Match::start() {
         game->team1Players(),
         game->team2Players()
     );
+}
+
+bool Match::onCommand(std::string line, SteamID player, Team team) {
+    trim(line);
+
+    auto handled = false;
+
+    std::visit(overloaded {
+        [&](Initializing& value) {
+
+        },
+        [&](ConfirmationPending& value) {
+            if (levenshtein_distance(line, "confirm") <= 2) {
+
+
+                handled = true;
+            }
+        },
+        [&](Running& value) {
+
+        },
+    }, state);
+
+    return handled;
 }

@@ -2,21 +2,33 @@
 
 #include <vector>
 #include <string>
+#include <variant>
 
 #include "igame.h"
 #include "citadel/iclient.h"
 
 class Match {
 public:
-    enum class State {
-        initializing,
-        waitingForConfirmation,
-        running,
-        sendingResults
+    struct Initializing {
     };
 
+    struct ConfirmationPending {
+        bool team1Confirmed;
+        bool team2Confirmed;
+    };
+
+    struct Running {
+
+    };
+
+    using State = std::variant<
+        Initializing,
+        ConfirmationPending,
+        Running
+    >;
+
 private:
-    State state = State::initializing;
+    State state = Initializing();
 
     std::vector<std::string> logs;
 
@@ -32,4 +44,6 @@ public:
     ~Match();
 
     void start();
+
+    bool onCommand(std::string, SteamID, Team);
 };

@@ -19,5 +19,8 @@ namespace mocks {
 
         void notifyError(std::string message, SteamID target) override;
         void resetMatch() override;
+
+        void notifyAll(std::string) override;
+        void notify(SteamID, std::string) override;
     };
 }

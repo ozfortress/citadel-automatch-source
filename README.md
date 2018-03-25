@@ -4,12 +4,12 @@
 
 * [source-sdk-2013](https://github.com/ValveSoftware/source-sdk-2013)
 * [CMake](https://cmake.org/)
-* A build environment for 32bit
+* A build environment for 32bit supporting C++17 (eg. `g++ 7`)
 
 ### Ubuntu Dependency Installation
 
 ```bash
-sudo apt install build-essential cmake libc6-dev-i386 gcc-multilib g++-multilib libcurl4-openssl-dev:i386
+sudo apt install build-essential cmake libc6-dev-i386 gcc-multilib g++-7-multilib libcurl4-openssl-dev:i386
 ```
 
 ## Building

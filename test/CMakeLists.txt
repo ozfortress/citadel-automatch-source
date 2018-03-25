@@ -33,6 +33,6 @@ target_link_libraries(tests libcatch citadel-automatch dl)
 # TODO: Move these to the top-level config. Avoids duplication in src project.
 # Set compile flags
 set_target_properties(tests PROPERTIES
-    COMPILE_FLAGS "-march=pentium4 -m32 -std=c++11"
+    COMPILE_FLAGS "-march=pentium4 -m32 -std=c++1z"
     LINK_FLAGS "-lrt -m32 -mmmx -msse -Wl,--no-gnu-unique -fuse-ld=gold -static-libstdc++ -static-libgcc"
 )
