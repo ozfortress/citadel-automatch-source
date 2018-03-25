@@ -16,6 +16,8 @@ matrix:
         - CC=gcc-7
         - CXX=g++-7
 
+  # Clang has a bug that makes compilation fail
+  allow_failures:
     - os: linux
       addons:
         apt:
