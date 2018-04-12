@@ -42,13 +42,6 @@ namespace citadel {
         virtual void registerPlugin(std::unique_ptr<Callback<RegisterPluginResponse>>, uint64_t matchId, std::string address, std::string password, std::string rconPassword, std::vector<SteamID> team1, std::vector<SteamID> team2) = 0;
 
         struct RegisterMatchResponse {
-            enum class State {
-                pending,
-                canceled,
-                error
-            };
-
-            State state;
             std::string matchToken;
         };
 

@@ -38,7 +38,7 @@ void Match::start() {
         explicit Callback(Match& match) : CitadelCallback(match) {}
 
         void onResult(std::unique_ptr<citadel::IClient::RegisterPluginResponse> response) override {
-            match.state = ConfirmationPending();
+            match.state = ConfirmationPending(response->registrationToken, response->confirmationURL);
 
             match.game->notifyAll("Plugin registered. Can one player of each team please type '!confirm' to confirm the rosters.");
         }
@@ -67,12 +67,11 @@ bool Match::onCommand(std::string line, SteamID player, Team team) {
     auto handled = false;
 
     std::visit(overloaded {
-        [&](Initializing& value) {
-
-        },
+        // No commands in the initialization state
+        [&](Initializing& value) {},
         [&](ConfirmationPending& value) {
             if (levenshtein_distance(line, "confirm") <= 2) {
-
+                onPlayerConfirm(value, player, team);
 
                 handled = true;
             }
@@ -83,4 +82,33 @@ bool Match::onCommand(std::string line, SteamID player, Team team) {
     }, state);
 
     return handled;
+}
+
+void Match::onPlayerConfirm(ConfirmationPending& state, SteamID player, Team team) {
+    game->openMOTD(player, state.confirmationURL);
+}
+
+void Match::onServerConfirm() {
+    auto confirmationPending = std::get_if<ConfirmationPending>(&state);
+    assert(confirmationPending != nullptr, "Invalid state");
+
+    struct Callback : public CitadelCallback<citadel::IClient::RegisterMatchResponse> {
+        explicit Callback(Match& match) : CitadelCallback(match) {}
+
+        void onResult(std::unique_ptr<citadel::IClient::RegisterMatchResponse> response) override {
+            match.state = Running();
+            // TODO
+        }
+
+        void onError(int32_t code, std::string error) override {
+            // TODO
+        }
+    };
+    std::unique_ptr<Callback> callback(new Callback(*this));
+
+    citadel->registerMatch(
+        std::move(callback),
+        matchId,
+        confirmationPending->registrationToken
+    );
 }

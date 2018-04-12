@@ -30,3 +30,5 @@ void mocks::Game::resetMatch() {}
 
 void mocks::Game::notifyAll(std::string message) {}
 void mocks::Game::notify(SteamID id, std::string message) {}
+
+void mocks::Game::openMOTD(SteamID id, std::string url) {}

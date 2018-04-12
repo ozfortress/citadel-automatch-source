@@ -18,6 +18,8 @@ public:
 
     virtual void notifyAll(std::string) = 0;
     virtual void notify(SteamID, std::string) = 0;
+
+    virtual void openMOTD(SteamID player, std::string url) = 0;
 };
 
 enum class Team {
