@@ -28,7 +28,7 @@ Once configured, you can now run `make` to build the plugin.
 ## Installing
 
 Running `make install` will create a directory `install/addons` with all the
-files generally needed to install a plugin.
+files generally needed to install the plugin.
 
 # TF2 Dependencies for 64bit Ubuntu
 
