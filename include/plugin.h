@@ -2,42 +2,69 @@
 
 #include <memory>
 
-#include "match.h"
-
-#include "engine/iserverplugin.h"
+#define META_NO_HL2SDK
+#include "iserverplugin.h"
 #include "igameevents.h"
+#include "game/server/iplayerinfo.h"
+#include "edict.h"
+#include "eiface.h"
+#include "ISmmPlugin.h"
+#include "provider/provider_ep2.h"
+#undef min
+#undef max
 
-class CitadelAutoMatchPlugin : public IServerPluginCallbacks, public IGameEventListener {
+#include "match.h"
+#include "requests.h"
+
+#define AUTHOR "Benjamin Schaaf"
+#define NAME "CitadelAutoMatch"
+#define DESCRIPTION "Automagically handle matches for the citadel league framework."
+#define URL ""
+#define LICENSE "GPLv3"
+#define VERSION "0.1.0"
+#define DATE "???"
+#define LOG_TAG "CAS"
+
+// Shitty metamod stuff
+extern CGlobalVars *gpGlobals;
+
+class CitadelAutoMatchPlugin : public ISmmPlugin, public IMetamodListener {
 public:
     static CitadelAutoMatchPlugin& instance();
 
     std::unique_ptr<Match> activeMatch;
+    std::unique_ptr<Requests> requests;
 
     CitadelAutoMatchPlugin();
     ~CitadelAutoMatchPlugin();
 
-    // IServerPluginCallbacks Interface
-    virtual bool Load(CreateInterfaceFn interfaceFactory, CreateInterfaceFn gameServerFactory);
-    virtual void Unload();
-    virtual void Pause();
-    virtual void UnPause();
-    virtual const char *GetPluginDescription();
-    virtual void LevelInit(char const *pMapName);
-    virtual void ServerActivate(edict_t *pEdictList, int edictCount, int clientMax);
-    virtual void GameFrame(bool simulating);
-    virtual void LevelShutdown();
-    virtual void ClientActive(edict_t *pEntity);
-    virtual void ClientDisconnect(edict_t *pEntity);
-    virtual void ClientPutInServer(edict_t *pEntity, char const *playername);
-    virtual void SetCommandClient(int index);
-    virtual void ClientSettingsChanged(edict_t *pEdict);
-    virtual PLUGIN_RESULT ClientConnect(bool *bAllowConnect, edict_t *pEntity, const char *pszName, const char *pszAddress, char *reject, int maxrejectlen);
-    virtual PLUGIN_RESULT ClientCommand(edict_t *pEntity, const CCommand &args);
-    virtual PLUGIN_RESULT NetworkIDValidated(const char *pszUserName, const char *pszNetworkID);
-    virtual void OnQueryCvarValueFinished(QueryCvarCookie_t iCookie, edict_t *pPlayerEntity, EQueryCvarValueStatus eStatus, const char *pCvarName, const char *pCvarValue);
-    virtual void OnEdictAllocated(edict_t *edict);
-    virtual void OnEdictFreed(const edict_t *edict );
+    const char *GetAuthor() override { return AUTHOR; };
+    const char *GetName() override { return NAME; };
+    const char *GetDescription() override { return DESCRIPTION; };
+    const char *GetURL() override { return URL; };
+    const char *GetLicense() override { return LICENSE; };
+    const char *GetVersion() override { return VERSION; };
+    const char *GetDate() override { return DATE; };
+    const char *GetLogTag() override { return LOG_TAG; };
 
-    // IGameEventListener Interface
-    virtual void FireGameEvent(KeyValues * event);
+    bool Load(PluginId id, ISmmAPI *ismm, char *error, size_t maxlength, bool late) override;
+    bool Unload(char *error, size_t maxlen) override;
+
+    void OnVSPListening(IServerPluginCallbacks *iface) override;
+
+    void onClientCommand(edict_t *pEntity, const CCommand &args);
+    void onSetCommandClient(int client);
+    void onSay(const CCommand &args);
+    void onSayTeam(const CCommand &args);
+
+private:
+    int lastClient;
+
+    void handleSay(const CCommand &command, bool isToAll);
+    void handleCommand(const std::string &command);
+    void startMatch();
 };
+
+extern CitadelAutoMatchPlugin g_CitadelAutoMatchPlugin;
+
+PLUGIN_GLOBALVARS();

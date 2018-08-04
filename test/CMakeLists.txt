@@ -5,12 +5,14 @@ find_package(Git REQUIRED)
 ExternalProject_Add(
     catch
     PREFIX ${EXT_PROJECTS_DIR}/catch
+    GIT_TAG ${CATCH_VERSION}
     GIT_REPOSITORY https://github.com/philsquared/Catch.git
-    TIMEOUT 10
-    UPDATE_COMMAND ${GIT_EXECUTABLE} fetch && ${GIT_EXECUTABLE} checkout ${CATCH_VERSION}
+    GIT_SHALLOW 1
+    GIT_PROGRESS 1
     CONFIGURE_COMMAND ""
     BUILD_COMMAND ""
     INSTALL_COMMAND ""
+    TIMEOUT 10
     LOG_DOWNLOAD ON
 )
 
@@ -32,7 +34,8 @@ target_link_libraries(tests libcatch citadel-automatch dl)
 
 # TODO: Move these to the top-level config. Avoids duplication in src project.
 # Set compile flags
+set(SOURCE_LIB_DIR ${SOURCE_SDK_DIR}/lib/public/linux32)
 set_target_properties(tests PROPERTIES
     COMPILE_FLAGS "-march=pentium4 -m32 -std=c++1z"
-    LINK_FLAGS "-lrt -m32 -mmmx -msse -Wl,--no-gnu-unique -fuse-ld=gold -static-libstdc++ -static-libgcc"
+    LINK_FLAGS "-lrt -m32 -mmmx -msse -Wl,--no-gnu-unique -fuse-ld=gold -static-libstdc++ -static-libgcc -L${SOURCE_LIB_DIR}"
 )

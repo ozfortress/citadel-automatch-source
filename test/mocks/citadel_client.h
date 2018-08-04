@@ -5,15 +5,36 @@
 namespace mocks {
     class CitadelClient : public citadel::IClient {
     public:
-        CitadelClient();
-        ~CitadelClient();
+        CitadelClient() {}
+        ~CitadelClient() {}
 
-        void findMatchForPlayers(std::unique_ptr<Callback<MatchForPlayersResponse>>, SteamID invokerSteamID, std::vector<SteamID> playerSteamIDs) override;
+        void findMatchForPlayers(
+            SteamID invokerSteamID,
+            std::vector<SteamID> playerSteamIDs,
+            std::function<void (std::vector<citadel::Match> matches)> onResult,
+            ErrorCallback onError) override {}
 
-        void registerPlugin(std::unique_ptr<Callback<RegisterPluginResponse>>, uint64_t matchId, std::string address, std::string password, std::string rconPassword, std::vector<SteamID> team1, std::vector<SteamID> team2) override;
+        void registerPlugin(
+            uint64_t matchId,
+            std::string address,
+            std::string password,
+            std::string rconPassword,
+            std::vector<SteamID> team1,
+            std::vector<SteamID> team2,
+            std::function<void (std::string registrationToken, std::string confirmationURL)> onResult,
+            ErrorCallback onError) override {}
 
-        void registerMatch(std::unique_ptr<Callback<RegisterMatchResponse>>, uint64_t matchId, std::string registrationToken) override;
+        void registerMatch(
+            uint64_t matchId,
+            std::string registrationToken,
+            std::function<void (std::string matchToken)> onResult,
+            ErrorCallback onError) override {}
 
-        void submitMatch(std::unique_ptr<Callback<void>>, uint64_t matchId, std::string matchToken, MatchResult result) override;
+        void submitMatch(
+            uint64_t matchId,
+            std::string matchToken,
+            MatchResult result,
+            std::function<void ()> onResult,
+            ErrorCallback onError) override {}
     };
 }

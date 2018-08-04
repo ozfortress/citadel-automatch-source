@@ -1,4 +1,5 @@
-Plugin
+"Metamod Plugin"
 {
-    file "addons/citadel-automatch.so"
+    "alias" "citadel-automatch"
+    "file"  "addons/metamod/citadel-automatch"
 }

@@ -16,14 +16,15 @@ public:
         std::string registrationToken;
         std::string confirmationURL;
 
-        // bool team1Confirmed;
-        // bool team2Confirmed;
-
-        ConfirmationPending(std::string a, std::string b) : registrationToken(a), confirmationURL(b) {}
+        ConfirmationPending(std::string a, std::string b)
+                : registrationToken(a)
+                , confirmationURL(b) {}
     };
 
     struct Running {
+        std::string matchToken;
 
+        Running(std::string m) : matchToken(m) {}
     };
 
     using State = std::variant<
@@ -43,6 +44,8 @@ private:
     std::string getLogs();
 
     void onPlayerConfirm(ConfirmationPending&, SteamID, Team);
+
+    void onMatchComplete(uint32_t homeTeamScore, uint32_t awayTeamScore);
 
 public:
     State state = Initializing();

@@ -14,7 +14,6 @@ class Queue {
 
 public:
     Queue() : queue(), mutex(), conditionVariable() {}
-    // ~Queue();
 
     /// Add an element to the queue.
     void enqueue(T t) {
@@ -38,7 +37,7 @@ public:
     }
 
     /// Determine if queue is empty
-    bool empty() {
+    bool empty() const {
         std::lock_guard<std::mutex> lock(mutex);
         return queue.empty();
     }

@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.5.1)
 project(citadel-automatch-source)
 
 # Dependency versions
+set(SOURCE_SDK_VERSION "sdk2013")
+set(METAMOD_VERSION "mmsource-1.10.6")
 set(CATCH_VERSION "v2.1.1")
 
 # Set the build directory

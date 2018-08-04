@@ -29,3 +29,7 @@ Once configured, you can now run `make` to build the plugin.
 
 Running `make install` will create a directory `install/addons` with all the
 files generally needed to install a plugin.
+
+# TF2 Dependencies for 64bit Ubuntu
+
+sudo apt-get install libtinfo5:i386 libncurses5:i386 libcurl3-gnutls:i386

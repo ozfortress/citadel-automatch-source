@@ -12,17 +12,23 @@ TEST_CASE("Match") {
             struct CitadelClient : public mocks::CitadelClient {
                 int calls = 0;
 
-                void registerPlugin(std::unique_ptr<Callback<RegisterPluginResponse>> callback, uint64_t matchId, std::string address, std::string password, std::string rconPassword, std::vector<SteamID> team1, std::vector<SteamID> team2) override {
+                void registerPlugin(uint64_t matchId,
+                        std::string address,
+                        std::string password,
+                        std::string rconPassword,
+                        std::vector<SteamID> team1,
+                        std::vector<SteamID> team2,
+                        std::function<void (std::string registrationToken, std::string confirmationURL)> onResult,
+                        ErrorCallback onError) override {
                     REQUIRE(matchId == 34);
                     REQUIRE(address == "127.0.0.1");
                     REQUIRE(password == "Password");
                     REQUIRE(rconPassword == "RConPassword");
                     calls++;
 
-                    std::unique_ptr<RegisterPluginResponse> result(new RegisterPluginResponse());
-                    result->registrationToken = "registration";
-                    result->confirmationURL = "https://warzone.ozfortress.com/plugins/source/automatch/plugin/confirm?token=foo";
-                    callback->onResult(std::move(result));
+                    const auto registrationToken = "registration";
+                    const auto confirmationURL = "https://warzone.ozfortress.com/plugins/source/automatch/plugin/confirm?token=foo";
+                    onResult(registrationToken, confirmationURL);
                 }
             };
 
@@ -53,8 +59,15 @@ TEST_CASE("Match") {
             struct CitadelClient : public mocks::CitadelClient {
                 int calls = 0;
 
-                void registerPlugin(std::unique_ptr<Callback<RegisterPluginResponse>> callback, uint64_t matchId, std::string address, std::string password, std::string rconPassword, std::vector<SteamID> team1, std::vector<SteamID> team2) override {
-                    callback->onError(500, "Internal Server Error");
+                void registerPlugin(uint64_t matchId,
+                        std::string address,
+                        std::string password,
+                        std::string rconPassword,
+                        std::vector<SteamID> team1,
+                        std::vector<SteamID> team2,
+                        std::function<void (std::string registrationToken, std::string confirmationURL)> onResult,
+                        ErrorCallback onError) override {
+                    onError(500, "Internal Server Error");
                     calls++;
                 }
             };
@@ -117,5 +130,9 @@ TEST_CASE("Match") {
 
     SECTION("::onServerConfirm") {
         // TODO
+    }
+
+    SECTION("::onMatchComplete") {
+
     }
 }
