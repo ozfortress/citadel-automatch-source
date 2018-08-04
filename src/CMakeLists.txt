@@ -22,28 +22,6 @@ ExternalProject_Get_Property(metamod source_dir)
 set(METAMOD_DIR ${source_dir} CACHE INTERNAL "Path to include folder for Metamod")
 set(METAMOD_CORE_DIR ${METAMOD_DIR}/core)
 
-# Metamod sources need to be compiled.
-# Need an explicit list here due to metamod being metamod.
-set(METAMOD_SOURCES
-    "${METAMOD_CORE_DIR}/metamod.cpp"
-    "${METAMOD_CORE_DIR}/metamod_util.cpp"
-    "${METAMOD_CORE_DIR}/metamod_console.cpp"
-    "${METAMOD_CORE_DIR}/metamod_oslink.cpp"
-    "${METAMOD_CORE_DIR}/metamod_plugins.cpp"
-    "${METAMOD_CORE_DIR}/sourcehook/sourcehook.cpp"
-    "${METAMOD_CORE_DIR}/sourcehook/sourcehook_hookmangen.cpp"
-    "${METAMOD_CORE_DIR}/sourcehook/sourcehook_impl_chookidman.cpp"
-    "${METAMOD_CORE_DIR}/sourcehook/sourcehook_impl_chookmaninfo.cpp"
-    "${METAMOD_CORE_DIR}/sourcehook/sourcehook_impl_cproto.cpp"
-    "${METAMOD_CORE_DIR}/sourcehook/sourcehook_impl_cvfnptr.cpp"
-    "${METAMOD_CORE_DIR}/provider/console.cpp"
-    "${METAMOD_CORE_DIR}/provider/provider_ep2.cpp"
-    "${METAMOD_CORE_DIR}/vsp_bridge.cpp"
-    "${METAMOD_CORE_DIR}/gamedll_bridge.cpp"
-)
-
-set_source_files_properties(${METAMOD_SOURCES} PROPERTIES GENERATED TRUE)
-
 # Handle Source SDK dependency
 ExternalProject_Add(
     source-sdk

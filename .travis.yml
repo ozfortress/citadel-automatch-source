@@ -1,4 +1,4 @@
-# language: cpp
+language: cpp
 
 matrix:
   include:
@@ -32,12 +32,8 @@ matrix:
         - CC=clang-5.0
         - CXX=clang++-5.0
 
-before_install:
-  # Fetch source sdk
-  - git clone --depth=1 https://github.com/ValveSoftware/source-sdk-2013.git
-
 script:
-  - cmake . -DSOURCE_SDK_DIR=source-sdk-2013/mp/src
+  - cmake .
   - make CTEST_OUTPUT_ON_FAILURE=1 all test install
 
 notifications:
