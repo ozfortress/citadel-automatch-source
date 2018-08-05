@@ -65,6 +65,12 @@ set(SOURCE_SDK_DIR ${source_dir} CACHE INTERNAL "Path to include folder for Sour
 file(GLOB_RECURSE SOURCES "*.cpp")
 add_library(citadel-automatch SHARED ${SOURCES})
 
+add_dependencies(citadel-automatch
+    metamod
+    rapidjson
+    source-sdk
+)
+
 # Set include paths
 include_directories(
     # RapidJSON header files
