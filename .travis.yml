@@ -1,8 +1,8 @@
 language: cpp
-
 matrix:
   include:
     - os: linux
+      dist: trusty
       addons:
         apt:
           sources:
@@ -13,27 +13,13 @@ matrix:
             - libc6-dev-i386
             - libcurl4-openssl-dev:i386
       env:
-        - CC=gcc-7
-        - CXX=g++-7
+        - MATRIX_EVAL="CC=gcc-7 && CXX=g++-7"
 
-  # Clang has a bug that makes compilation fail
-  allow_failures:
-    - os: linux
-      addons:
-        apt:
-          sources:
-            - llvm-toolchain-trusty-5.0
-
-          packages:
-            - clang-5.0
-            - libc6-dev-i386
-            - libcurl4-openssl-dev:i386
-      env:
-        - CC=clang-5.0
-        - CXX=clang++-5.0
+before_install:
+  - eval "${MATRIX_EVAL}"
+  - cmake .
 
 script:
-  - cmake .
   - make CTEST_OUTPUT_ON_FAILURE=1 all test install
 
 notifications:
