@@ -3,6 +3,8 @@
 #include <variant>
 #include <functional>
 
+#include "rapidjson/document.h"
+
 #include "queue.h"
 
 class Requests final {
@@ -29,6 +31,7 @@ public:
     struct Response final {
         uint32_t code = 200;
         std::string body;
+        rapidjson::Document json;
     };
 
     Requests();

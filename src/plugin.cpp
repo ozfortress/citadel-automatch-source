@@ -2,6 +2,7 @@
 
 #include <cstdio>
 
+#include "citadel/client.h"
 #include "utils.h"
 
 // #include <igameevents.h>
@@ -70,7 +71,7 @@ bool CitadelAutoMatchPlugin::Load(PluginId id, ISmmAPI *ismm, char *error, size_
     META_LOG(g_PLAPI, "CitadelAutoMatchPlugin loaded\n");
     Warning("Yo, Merry Christmas\n");
 
-    requests = std::make_unique<Requests>();
+    requests = std::make_shared<Requests>();
 
     return true;
 }
@@ -124,23 +125,30 @@ void CitadelAutoMatchPlugin::handleSay(const CCommand &command, bool isToAll) {
 }
 
 void CitadelAutoMatchPlugin::handleCommand(const std::string &command) {
-    if (levenshtein_distance(command, "match") <= 2) {
-        startMatch();
+    if (activeMatch) {
+
+    } else if (matchPicker) {
+        // auto match = matchPicker->onClientCommand();
+
+        // if (match) {
+        //     matchPicker = nullptr;
+        //     activeMatch = std::move(match);
+        // }
+    } else {
+        if (levenshtein_distance(command, "match") <= 2) {
+            startMatch();
+        }
     }
 }
 
 void CitadelAutoMatchPlugin::startMatch() {
-    Warning("Starting Match!\n");
+    // TODO: CVar
+    std::vector<std::string> endpoints;
+    endpoints.push_back("https://127.0.0.1:3000");
 
-    auto req = Requests::Request(Requests::Method::GET, "https://httpbin.org/get");
-    requests->request(req,
-        [&](const Requests::Response &res) {
-            Warning(format("%d %s\n", res.code, res.body).c_str());
-            printf("%d %s\n", res.code, res.body.c_str());
-        },
-        [&](std::string error) {
-            Warning(format("CURL ERROR: %s\n", error).c_str());
-        }
-    );
+    matchPicker = MatchPicker::create<citadel::Client>(requests, endpoints);
+
+    // TODO:
+    // matchPicket.queryAll()
 }
 

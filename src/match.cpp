@@ -7,10 +7,10 @@
 
 #include "utils.h"
 
-Match::Match(std::shared_ptr<IGame> game, std::shared_ptr<citadel::IClient> citadel, uint64_t matchId)
+Match::Match(std::shared_ptr<IGame> game, std::shared_ptr<citadel::IClient> citadel, const citadel::Match &match)
         : game(std::move(game))
         , citadel(std::move(citadel))
-        , matchId(matchId) {}
+        , matchInfo(match) {}
 
 Match::~Match() {}
 
@@ -45,7 +45,7 @@ void Match::onMatchComplete(uint32_t homeTeamScore, uint32_t awayTeamScore) {
     auto result = citadel::IClient::MatchResult(homeTeamScore, awayTeamScore, getLogs());
 
     citadel->submitMatch(
-        matchId,
+        matchInfo.id,
         running->matchToken,
         result,
         [=]() {
@@ -63,7 +63,7 @@ void Match::start() {
     state = Initializing();
 
     citadel->registerPlugin(
-        matchId,
+        matchInfo.id,
         game->serverAddress(),
         game->serverPassword(),
         game->serverRConPassword(),
@@ -114,7 +114,7 @@ void Match::onServerConfirm() {
     assert(confirmationPending != nullptr, "Invalid state");
 
     citadel->registerMatch(
-        matchId,
+        matchInfo.id,
         confirmationPending->registrationToken,
         [=](std::string matchToken) {
             state = Running(matchToken);

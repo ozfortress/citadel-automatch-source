@@ -22,6 +22,25 @@ ExternalProject_Get_Property(metamod source_dir)
 set(METAMOD_DIR ${source_dir} CACHE INTERNAL "Path to include folder for Metamod")
 set(METAMOD_CORE_DIR ${METAMOD_DIR}/core)
 
+# Handle RapidJSON Dependency
+ExternalProject_Add(
+    rapidjson
+    PREFIX ${EXT_PROJECTS_DIR}/rapidjson
+    GIT_TAG ${RAPIDJSON_VERSION}
+    GIT_REPOSITORY https://github.com/Tencent/rapidjson.git
+    GIT_SHALLOW 1
+    GIT_PROGRESS 1
+    CONFIGURE_COMMAND ""
+    BUILD_COMMAND ""
+    INSTALL_COMMAND ""
+    TIMEOUT 10
+    LOG_DOWNLOAD ON
+)
+
+# Expose RAPIDJSON_INCLUDE_DIR
+ExternalProject_Get_Property(rapidjson source_dir)
+set(RAPIDJSON_INCLUDE_DIR ${source_dir} CACHE INTERNAL "Path to include folder for rapidJSON")
+
 # Handle Source SDK dependency
 ExternalProject_Add(
     source-sdk
@@ -43,26 +62,28 @@ ExternalProject_Get_Property(source-sdk source_dir)
 set(SOURCE_SDK_DIR ${source_dir} CACHE INTERNAL "Path to include folder for Source SDK")
 
 # Build the citadel-automatch plugin
-file(GLOB SOURCES "*.cpp")
+file(GLOB_RECURSE SOURCES "*.cpp")
 add_library(citadel-automatch SHARED ${SOURCES})
 
 # Set include paths
 include_directories(
+    # RapidJSON header files
+    ${RAPIDJSON_INCLUDE_DIR}/include
     # Metamod header files
-    "${METAMOD_DIR}/loader"
-    "${METAMOD_DIR}/versionlib"
-    "${METAMOD_CORE_DIR}"
-    "${METAMOD_CORE_DIR}/sourcehook"
+    ${METAMOD_DIR}/loader
+    ${METAMOD_DIR}/versionlib
+    ${METAMOD_CORE_DIR}
+    ${METAMOD_CORE_DIR}/sourcehook
     # This projects header files
-    "${CMAKE_BINARY_DIR}/include"
+    ${CMAKE_BINARY_DIR}/include
     # Source SDK header files
-    "${SOURCE_SDK_DIR}/public"
-    "${SOURCE_SDK_DIR}/public/tier0"
-    "${SOURCE_SDK_DIR}/public/tier1"
-    "${SOURCE_SDK_DIR}/public/engine"
-    "${SOURCE_SDK_DIR}/public/game/server"
-    "${SOURCE_SDK_DIR}/game/shared"
-    "${SOURCE_SDK_DIR}/game/server"
+    ${SOURCE_SDK_DIR}/public
+    ${SOURCE_SDK_DIR}/public/tier0
+    ${SOURCE_SDK_DIR}/public/tier1
+    ${SOURCE_SDK_DIR}/public/engine
+    ${SOURCE_SDK_DIR}/public/game/server
+    ${SOURCE_SDK_DIR}/game/shared
+    ${SOURCE_SDK_DIR}/game/server
 )
 
 # Don't add `lib` out the front of the library name
@@ -145,7 +166,7 @@ elseif(WIN32)
 
     add_definitions(-DWIN32 -D_WIN32)
 
-    link_directories("${SOURCE_SDK_DIR}/lib/public")
+    link_directories(${SOURCE_SDK_DIR}/lib/public)
 
     # TODO: Libraries
 

@@ -38,7 +38,7 @@ private:
 
     std::shared_ptr<IGame> game;
     std::shared_ptr<citadel::IClient> citadel;
-    uint64_t matchId;
+    citadel::Match matchInfo;
 
     void log(std::string);
     std::string getLogs();
@@ -50,7 +50,7 @@ private:
 public:
     State state = Initializing();
 
-    Match(std::shared_ptr<IGame>, std::shared_ptr<citadel::IClient>, uint64_t matchId);
+    Match(std::shared_ptr<IGame>, std::shared_ptr<citadel::IClient>, const citadel::Match &match);
     ~Match();
 
     void start();

@@ -2,6 +2,8 @@
 
 #include "utils.h"
 
+#include "rapidjson/error/en.h"
+
 #include <cstdio>
 
 #include <curl/curl.h>
@@ -87,13 +89,19 @@ static void curlDoRequest(const Requests::RequestEvent &event) {
         std::string error(curl_easy_strerror(result));
 
         event.onError(error);
+    } else {
+        res.json.Parse(res.body.c_str());
+
+        if (res.json.HasParseError()) {
+            auto code = res.json.GetParseError();
+            auto name = rapidjson::GetParseError_En(code);
+            event.onError(format("RapidJSON error: %s\n", name));
+        } else {
+            curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &res.code);
+
+            event.onResult(res);
+        }
     }
-
-    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &res.code);
-
-    printf("Completed Request with %d %s\n", res.code, res.body.c_str());
-
-    event.onResult(res);
 
     curl_easy_cleanup(curl);
 }

@@ -12,12 +12,16 @@ namespace citadel {
     struct Roster {
         uint64_t id;
         std::string name;
+
+        Roster(uint64_t i, std::string n) : id(i), name(n) {}
     };
 
     struct Match {
         uint64_t id;
         Roster homeTeam;
         Roster awayTeam;
+
+        Match(uint64_t i, Roster h, Roster a) : id(i), homeTeam(h), awayTeam(a) {}
     };
 
     class IClient {

@@ -14,6 +14,7 @@
 #undef max
 
 #include "match.h"
+#include "match_picker.h"
 #include "requests.h"
 
 #define AUTHOR "Benjamin Schaaf"
@@ -32,8 +33,10 @@ class CitadelAutoMatchPlugin : public ISmmPlugin, public IMetamodListener {
 public:
     static CitadelAutoMatchPlugin& instance();
 
+    std::shared_ptr<Requests> requests;
+
+    std::unique_ptr<MatchPicker> matchPicker;
     std::unique_ptr<Match> activeMatch;
-    std::unique_ptr<Requests> requests;
 
     CitadelAutoMatchPlugin();
     ~CitadelAutoMatchPlugin();

@@ -6,6 +6,8 @@
 
 #include "mocks.h"
 
+citadel::Match matchDetails(34, citadel::Roster(1, "foo"), citadel::Roster(2, "bar"));
+
 TEST_CASE("Match") {
     SECTION("::start") {
         SECTION("works normally") {
@@ -34,7 +36,7 @@ TEST_CASE("Match") {
 
             std::shared_ptr<CitadelClient> citadel(new CitadelClient());
             std::shared_ptr<IGame> game(new mocks::Game());
-            std::unique_ptr<Match> match(new Match(game, citadel, 34));
+            std::unique_ptr<Match> match(new Match(game, citadel, matchDetails));
             match->start();
 
             REQUIRE(citadel->calls == 1);
@@ -74,7 +76,7 @@ TEST_CASE("Match") {
 
             std::shared_ptr<CitadelClient> citadel(new CitadelClient());
             std::shared_ptr<Game> game(new Game());
-            std::unique_ptr<Match> match(new Match(game, citadel, 34));
+            std::unique_ptr<Match> match(new Match(game, citadel, matchDetails));
             match->start();
 
             REQUIRE(citadel->calls == 1);
@@ -98,7 +100,7 @@ TEST_CASE("Match") {
 
                 std::shared_ptr<citadel::IClient> citadel(nullptr);
                 std::shared_ptr<Game> game(new Game());
-                std::unique_ptr<Match> match(new Match(game, citadel, 34));
+                std::unique_ptr<Match> match(new Match(game, citadel, matchDetails));
 
                 std::string url("http://example.com/confirm");
                 match->state = Match::ConfirmationPending("123", url);
