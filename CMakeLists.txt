@@ -25,3 +25,6 @@ add_subdirectory(${CMAKE_BINARY_DIR}/test)
 # Testing
 enable_testing()
 add_test(NAME unittests COMMAND ${BUILD_DIR}/tests) # Test using the tests project
+
+set(SOURCE_LIB_DIR ${SOURCE_SDK_DIR}/lib/public/linux32)
+set_property(TEST unittests PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${SOURCE_LIB_DIR}")
