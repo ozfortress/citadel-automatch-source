@@ -33,3 +33,7 @@ files generally needed to install the plugin.
 # TF2 Dependencies for 64bit Ubuntu
 
 sudo apt-get install libtinfo5:i386 libncurses5:i386 libcurl3-gnutls:i386
+
+## Testing
+
+Run tests with `CTEST_OUTPUT_ON_FAILURE=1 make test`.
