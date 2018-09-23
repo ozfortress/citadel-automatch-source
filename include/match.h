@@ -43,19 +43,19 @@ private:
     void log(std::string);
     std::string getLogs();
 
-    void onPlayerConfirm(ConfirmationPending&, SteamID, Team);
+    void onPlayerConfirm(std::string &, SteamID);
 
     void onMatchComplete(uint32_t homeTeamScore, uint32_t awayTeamScore);
 
 public:
     State state = Initializing();
 
-    Match(std::shared_ptr<IGame>, std::shared_ptr<citadel::IClient>, const citadel::Match &match);
+    Match(std::shared_ptr<IGame>, std::shared_ptr<citadel::IClient>, const citadel::Match& match);
     ~Match();
 
-    void start();
+    void start(SteamID starter);
 
-    bool onCommand(std::string, SteamID, Team);
+    bool onCommand(SteamID, std::string);
 
     void onServerConfirm();
 };

@@ -7,7 +7,7 @@
 
 #include "utils.h"
 
-Match::Match(std::shared_ptr<IGame> game, std::shared_ptr<citadel::IClient> citadel, const citadel::Match &match)
+Match::Match(std::shared_ptr<IGame> game, std::shared_ptr<citadel::IClient> citadel, const citadel::Match& match)
         : game(std::move(game))
         , citadel(std::move(citadel))
         , matchInfo(match) {}
@@ -34,8 +34,8 @@ std::string Match::getLogs() {
     return joined.str();
 }
 
-void Match::onPlayerConfirm(ConfirmationPending& state, SteamID player, Team team) {
-    game->openMOTD(player, state.confirmationURL);
+void Match::onPlayerConfirm(std::string& confirmationURL, SteamID player) {
+    game->openMOTD(player, "AutoMatch Confirmation", confirmationURL);
 }
 
 void Match::onMatchComplete(uint32_t homeTeamScore, uint32_t awayTeamScore) {
@@ -59,11 +59,16 @@ void Match::onMatchComplete(uint32_t homeTeamScore, uint32_t awayTeamScore) {
     );
 }
 
-void Match::start() {
+void Match::start(SteamID starter) {
+    printf("Registering plugin (%d, %d)\n", game == nullptr, citadel == nullptr);
+
+    game->notifyAll(format("Starting match %s vs %s", matchInfo.homeTeam.name.c_str(), matchInfo.awayTeam.name.c_str()));
+
     state = Initializing();
 
     citadel->registerPlugin(
         matchInfo.id,
+        starter,
         game->serverAddress(),
         game->serverPassword(),
         game->serverRConPassword(),
@@ -72,7 +77,7 @@ void Match::start() {
         [=](std::string registrationToken, std::string confirmationURL) {
             state = ConfirmationPending(registrationToken, confirmationURL);
 
-            game->notifyAll("Plugin registered. Can one player of each team please type '!confirm' to confirm the rosters.");
+            game->notifyAll("Plugin registered. One player on each team please type !confirm and follow instructions to start the match.");
         },
         [=](int32_t code, std::string error) {
             game->notifyError(format("Failed to register plugin for match. Got error %d with message '%s'", code, error.c_str()));
@@ -81,7 +86,7 @@ void Match::start() {
     );
 }
 
-bool Match::onCommand(std::string line, SteamID player, Team team) {
+bool Match::onCommand(SteamID player, std::string line) {
     trim(line);
 
     auto handled = false;
@@ -91,9 +96,13 @@ bool Match::onCommand(std::string line, SteamID player, Team team) {
         [&](Initializing& value) {},
         [&](ConfirmationPending& value) {
             if (levenshtein_distance(line, "confirm") <= 2) {
-                onPlayerConfirm(value, player, team);
+                onPlayerConfirm(value.confirmationURL, player);
 
                 handled = true;
+            }
+
+            if (levenshtein_distance(line, "cancel") <= 2) {
+                game->resetMatch();
             }
         },
         [&](Running& value) {

@@ -1,23 +1,51 @@
 #include "match_picker.h"
 
-void MatchPicker::afterAllResults() {
+#include "utils.h"
 
+MatchPicker::MatchPicker(
+        const SteamID steamId,
+        const std::vector<std::shared_ptr<citadel::IClient>>& clients,
+        const std::shared_ptr<IGame> game)
+        : starter(steamId), clients(clients), game(game) {}
+
+void MatchPicker::afterAllResults() {
+    printf("Match picker completed with %zu matches\n", matches.size());
+
+    if (matches.size() == 0) {
+        game->notifyError("There are no pending matches for the players in this server.", starter);
+        game->resetMatch();
+        return;
+    }
+
+    // TODO: Improve message
+    game->notifyAll("A match has been requested to start.");
+
+    game->notify(starter, "Please type `!N` where N is one of:");
+
+    for (size_t i = 0; i < matches.size(); i++) {
+        auto& match = matches[i];
+        auto& homeTeam = match.details.homeTeam;
+        auto& awayTeam = match.details.awayTeam;
+
+        game->notify(starter, format("%zu. %s vs %s", i + 1, homeTeam.name.c_str(), awayTeam.name.c_str()));
+    }
 }
 
-void MatchPicker::queryAll(SteamID starter, std::vector<SteamID> &players) {
-    this->starter = starter;
-
-    for (auto &client : clients) {
+void MatchPicker::queryAll(std::vector<SteamID>& players) {
+    for (auto& client : clients) {
         client->findMatchForPlayers(
             starter,
             players,
             [=](std::vector<citadel::Match> matches) {
-                clientResults++;
-                if (clientResults == clients.size()) afterAllResults();
+                printf("Received %zu Matches\n", matches.size());
 
-                for (auto &match : matches) {
+                for (auto& match : matches) {
                     this->matches.push_back(Match(client, match));
                 }
+
+                clientResults++;
+                printf("%zu of %zu received\n", clientResults, clients.size());
+                if (clientResults == clients.size()) afterAllResults();
             },
             [=](uint32_t code, std::string error) {
                 clientResults++;
@@ -28,17 +56,22 @@ void MatchPicker::queryAll(SteamID starter, std::vector<SteamID> &players) {
     }
 }
 
-std::unique_ptr<Match> MatchPicker::onCommand(std::string command, SteamID id, Team team) {
+std::unique_ptr<Match> MatchPicker::onCommand(SteamID id, std::string command) {
     if (id != starter) return nullptr;
+    if (clientResults != clients.size()) return nullptr;
 
     int32_t matchIndex = atoi(command.c_str());
 
     if (matchIndex <= 0 || matchIndex > matches.size()) {
+        game->notify(starter, "Please select a valid match.");
         // TODO: Send an error
 
         return nullptr;
     }
 
-    auto &match = matches[matchIndex + 1];
-    return std::make_unique<::Match>(nullptr, match.client, match.details);
+    auto& match = matches[matchIndex - 1];
+
+    printf("Starting match: %s vs %s\n", match.details.homeTeam.name.c_str(), match.details.awayTeam.name.c_str());
+
+    return std::make_unique<::Match>(std::move(game), std::move(match.client), match.details);
 }

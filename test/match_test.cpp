@@ -14,7 +14,9 @@ TEST_CASE("Match") {
             struct CitadelClient : public mocks::CitadelClient {
                 int calls = 0;
 
-                void registerPlugin(uint64_t matchId,
+                void registerPlugin(
+                        uint64_t matchId,
+                        SteamID starter,
                         std::string address,
                         std::string password,
                         std::string rconPassword,
@@ -23,6 +25,7 @@ TEST_CASE("Match") {
                         std::function<void (std::string registrationToken, std::string confirmationURL)> onResult,
                         ErrorCallback onError) override {
                     REQUIRE(matchId == 34);
+                    REQUIRE(starter == SteamID(3));
                     REQUIRE(address == "127.0.0.1");
                     REQUIRE(password == "Password");
                     REQUIRE(rconPassword == "RConPassword");
@@ -37,7 +40,7 @@ TEST_CASE("Match") {
             std::shared_ptr<CitadelClient> citadel(new CitadelClient());
             std::shared_ptr<IGame> game(new mocks::Game());
             std::unique_ptr<Match> match(new Match(game, citadel, matchDetails));
-            match->start();
+            match->start(SteamID(3));
 
             REQUIRE(citadel->calls == 1);
         }
@@ -61,7 +64,9 @@ TEST_CASE("Match") {
             struct CitadelClient : public mocks::CitadelClient {
                 int calls = 0;
 
-                void registerPlugin(uint64_t matchId,
+                void registerPlugin(
+                        uint64_t matchId,
+                        SteamID starter,
                         std::string address,
                         std::string password,
                         std::string rconPassword,
@@ -77,7 +82,7 @@ TEST_CASE("Match") {
             std::shared_ptr<CitadelClient> citadel(new CitadelClient());
             std::shared_ptr<Game> game(new Game());
             std::unique_ptr<Match> match(new Match(game, citadel, matchDetails));
-            match->start();
+            match->start(SteamID(3));
 
             REQUIRE(citadel->calls == 1);
             REQUIRE(game->notifyErrorCalls == 1);
@@ -92,7 +97,7 @@ TEST_CASE("Match") {
                     SteamID playerMOTD = SteamID(0);
                     std::string urlMOTD = "";
 
-                    void openMOTD(SteamID player, std::string url) {
+                    void openMOTD(SteamID player, std::string title, std::string url) override {
                         playerMOTD = player;
                         urlMOTD = url;
                     }
@@ -106,23 +111,23 @@ TEST_CASE("Match") {
                 match->state = Match::ConfirmationPending("123", url);
 
                 SteamID player1(123);
-                REQUIRE(match->onCommand("confirm", player1, Team::team1) == true);
+                REQUIRE(match->onCommand(player1, "confirm") == true);
 
                 REQUIRE(game->playerMOTD == player1);
                 REQUIRE(game->urlMOTD == url);
 
                 SteamID player2(456);
-                REQUIRE(match->onCommand("confirm ", player2, Team::team1) == true);
+                REQUIRE(match->onCommand(player2, "confirm ") == true);
 
                 REQUIRE(game->playerMOTD == player2);
                 REQUIRE(game->urlMOTD == url);
 
-                REQUIRE(match->onCommand("conifrm", player1, Team::team2) == true);
+                REQUIRE(match->onCommand(player1, "conifrm") == true);
 
                 REQUIRE(game->playerMOTD == player1);
                 REQUIRE(game->urlMOTD == url);
 
-                REQUIRE(match->onCommand("cinfurn", player2, Team::team2) == false);
+                REQUIRE(match->onCommand(player2, "cinfurn") == false);
 
                 REQUIRE(game->playerMOTD == player1);
                 REQUIRE(game->urlMOTD == url);

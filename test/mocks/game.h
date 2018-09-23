@@ -23,6 +23,6 @@ namespace mocks {
         void notifyAll(std::string) override;
         void notify(SteamID, std::string) override;
 
-        void openMOTD(SteamID, std::string) override;
+        void openMOTD(SteamID, std::string, std::string) override;
     };
 }

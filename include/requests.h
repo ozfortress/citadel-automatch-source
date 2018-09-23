@@ -19,12 +19,12 @@ public:
         const std::string url;
         const std::vector<std::pair<std::string, std::string>> params;
 
-        Request(const Method &m, const std::string &u) : method(m), url(u) {}
+        Request(const Method& m, const std::string& u) : method(m), url(u) {}
 
         Request(
-                const Method &m,
-                const std::string &u,
-                const std::vector<std::pair<std::string, std::string>> &v)
+                const Method& m,
+                const std::string& u,
+                const std::vector<std::pair<std::string, std::string>>& v)
             : method(m), url(u), params(v) {}
     };
 
@@ -38,20 +38,20 @@ public:
     ~Requests();
 
     void request(
-        const Request &req,
-        const std::function<void (const Response &res)> &onResult,
-        const std::function<void (const std::string &msg)> &onError
+        const Request& req,
+        const std::function<void (const Response& res)>& onResult,
+        const std::function<void (const std::string& msg)>& onError
     );
 
     struct RequestEvent final {
         const Request req;
-        const std::function<void (const Response &res)> onResult;
-        const std::function<void (const std::string &msg)> onError;
+        const std::function<void (const Response& res)> onResult;
+        const std::function<void (const std::string& msg)> onError;
 
         RequestEvent(
-                const Request &r,
-                const std::function<void (const Response &res)> &o,
-                const std::function<void (const std::string &msg)> &e)
+                const Request& r,
+                const std::function<void (const Response& res)>& o,
+                const std::function<void (const std::string& msg)>& e)
             : req(r), onResult(o), onError(e) {}
     };
 

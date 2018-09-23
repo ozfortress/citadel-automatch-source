@@ -8,18 +8,24 @@
 
 #include <curl/curl.h>
 
-static std::string requestBuildURL(const Requests::Request &req, CURL *curl) {
-    std::string url = req.url + "?";
+static std::string buildParams(const std::vector<std::pair<std::string, std::string>>& params, CURL *curl) {
+    std::string result;
 
-    for (auto &param : req.params) {
+    for (auto &param : params) {
         auto valuePtr = curl_easy_escape(curl, param.second.c_str(), param.second.length());
 
-        url += param.first + "=" + std::string(valuePtr);
+        result += param.first + "=" + std::string(valuePtr) + "&";
 
         curl_free(valuePtr);
     }
 
-    return url;
+    return result;
+}
+
+static std::string requestBuildURL(const Requests::Request& req, CURL *curl) {
+    if (req.params.empty()) return req.url;
+
+    return req.url + "?" + buildParams(req.params, curl);
 }
 
 Requests::Requests() {
@@ -36,9 +42,9 @@ Requests::~Requests() {
 }
 
 void Requests::request(
-        const Request &req,
-        const std::function<void (const Response &res)> &onResult,
-        const std::function<void (const std::string &msg)> &onError) {
+        const Request& req,
+        const std::function<void (const Response& res)> &onResult,
+        const std::function<void (const std::string& msg)> &onError) {
 
     eventQueue.enqueue(RequestEvent(
         req,
@@ -58,7 +64,7 @@ static size_t curlWriteCallback(char *ptr, size_t size, size_t nmemb, void *user
     return realSize;
 }
 
-static void curlDoRequest(const Requests::RequestEvent &event) {
+static void curlDoRequest(const Requests::RequestEvent& event) {
     CURL *curl = curl_easy_init();
     assert(curl != nullptr, "Failed curl init");
 
@@ -73,10 +79,23 @@ static void curlDoRequest(const Requests::RequestEvent &event) {
             assert(0, "Unsupported HTTP method");
     }
 
-    const auto url = requestBuildURL(event.req, curl);
+    std::string url;
+    if (event.req.method == Requests::Method::GET) {
+        url = requestBuildURL(event.req, curl);
+    } else {
+        url = event.req.url;
+    }
+
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 
     printf("Requesting %s\n", url.c_str());
+
+    std::string body;
+    if (event.req.method == Requests::Method::POST) {
+        body = buildParams(event.req.params, curl);
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, body.c_str());
+        printf("With Body: %s\n", body.c_str());
+    }
 
     Requests::Response res;
 

@@ -20,6 +20,7 @@ namespace citadel {
 
         void registerPlugin(
             uint64_t matchId,
+            SteamID starter,
             std::string address,
             std::string password,
             std::string rconPassword,

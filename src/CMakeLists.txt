@@ -90,6 +90,7 @@ include_directories(
     ${SOURCE_SDK_DIR}/public/game/server
     ${SOURCE_SDK_DIR}/game/shared
     ${SOURCE_SDK_DIR}/game/server
+    ${SOURCE_SDK_DIR}/common
 )
 
 # Don't add `lib` out the front of the library name
@@ -99,13 +100,13 @@ set_property(GLOBAL PROPERTY FIND_LIBRARY_USE_LIB64_PATHS OFF)
 
 # Platform specific settings
 if(UNIX)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=pentium4 -m32 -std=c++17 -fpermissive -fno-rtti -fPIC -fno-exceptions -fno-rtti -DSOURCE_ENGINE=3 -DSE_EPISODEONE=1 -DSE_DARKMESSIAH=2 -DSE_ORANGEBOX=3 -DSE_BLOODYGOODTIME=4 -DSE_EYE=5 \
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -march=pentium4 -m32 -std=c++17 -fpermissive -fno-rtti -fPIC -fno-exceptions -fno-rtti -DSOURCE_ENGINE=3 -DSE_EPISODEONE=1 -DSE_DARKMESSIAH=2 -DSE_ORANGEBOX=3 -DSE_BLOODYGOODTIME=4 -DSE_EYE=5 \
     -DSE_CSS=6 -DSE_ORANGEBOXVALVE=7 -DSE_LEFT4DEAD=8 -DSE_LEFT4DEAD2=9 -DSE_ALIENSWARM=10 \
     -DSE_PORTAL2=11 -DSE_CSGO=12 -DPOSIX -Dstricmp=strcasecmp -D_stricmp=strcasecmp -D_strnicmp=strncasecmp \
     -Dstrnicmp=strncasecmp -D_snprintf=snprintf -D_vsnprintf=vsnprintf -D_alloca=alloca \
     -Dstrcmpi=strcasecmp -DCOMPILER_GCC")
     set(SOURCE_LIB_DIR ${SOURCE_SDK_DIR}/lib/public/linux32)
-    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -lrt -m32 -mmmx -msse -Wl,--no-gnu-unique -fuse-ld=gold -static-libstdc++ -static-libgcc -L${SOURCE_LIB_DIR}")
+    set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -lrt -m32 -mmmx -msse -Wl,-z,muldefs,--no-gnu-unique -fuse-ld=gold -static-libstdc++ -static-libgcc -L${SOURCE_LIB_DIR}")
 
     add_definitions(-DPOSIX -DGNUC -DNO_MALLOC_OVERRIDE)
 
