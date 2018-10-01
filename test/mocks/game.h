@@ -38,9 +38,9 @@ namespace mocks {
         const std::string_view serverRConPassword() const override;
         const std::string_view serverName() const override;
 
-        std::vector<IPlayer *> team1Players() const override;
-        std::vector<IPlayer *> team2Players() const override;
-        std::vector<IPlayer *> nonTeamPlayers() const override;
+        std::vector<IPlayer *> team1Players() override;
+        std::vector<IPlayer *> team2Players() override;
+        std::vector<IPlayer *> nonTeamPlayers() override;
 
         void resetMatch() override;
 

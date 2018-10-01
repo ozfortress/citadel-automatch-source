@@ -57,7 +57,7 @@ namespace mocks {
         return "Test Server";
     }
 
-    std::vector<IPlayer *> Game::team1Players() const {
+    std::vector<IPlayer *> Game::team1Players() {
         std::vector<IPlayer *> players;
         for (auto player : this->players) {
             if (player->getTeam() == Team::team1) {
@@ -67,7 +67,7 @@ namespace mocks {
         return players;
     }
 
-    std::vector<IPlayer *> Game::team2Players() const {
+    std::vector<IPlayer *> Game::team2Players() {
         std::vector<IPlayer *> players;
         for (auto player : this->players) {
             if (player->getTeam() == Team::team2) {
@@ -77,7 +77,7 @@ namespace mocks {
         return players;
     }
 
-    std::vector<IPlayer *> Game::nonTeamPlayers() const {
+    std::vector<IPlayer *> Game::nonTeamPlayers() {
         std::vector<IPlayer *> players;
         for (auto player : this->players) {
             if (player->getTeam() == Team::other) {

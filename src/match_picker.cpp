@@ -3,9 +3,9 @@
 #include "utils.h"
 
 MatchPicker::MatchPicker(
-        const IPlayer *starter,
-        const std::vector<std::shared_ptr<citadel::IClient>>& clients,
-        IGame *game)
+        IPlayer *starter,
+        IGame *game,
+        const std::vector<std::shared_ptr<citadel::IClient>>& clients)
         : starter(starter), clients(clients), game(game) {}
 
 void MatchPicker::afterAllResults() {

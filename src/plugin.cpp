@@ -83,7 +83,7 @@ namespace {
         }
 
         void addPlayer(int playerId) {
-            assert(count < MAX_PLAYERS, "Overflow");
+            sassert(count < MAX_PLAYERS, "Overflow");
 
             recipients[count] = playerId;
             count++;
@@ -173,10 +173,10 @@ class CitadelAutoMatchPlugin : public ISmmPlugin, public IMetamodListener, publi
             this->edict = edict;
             this->info = playerinfomanager->GetPlayerInfo(edict);
             printf("Creating player {index: %d, id: %d}\n", engine->IndexOfEdict(edict), this->info->GetUserID());
-            assert(this->info != nullptr, "PlayerInfo is null");
+            sassert(this->info != nullptr, "PlayerInfo is null");
 
             const CSteamID *cSteamId = engine->GetClientSteamID(edict);
-            assert(cSteamId != nullptr, "CSteamID is null");
+            sassert(cSteamId != nullptr, "CSteamID is null");
 
             this->steam_id = SteamID(cSteamId->ConvertToUint64());
         }
@@ -290,7 +290,7 @@ class CitadelAutoMatchPlugin : public ISmmPlugin, public IMetamodListener, publi
     ~CitadelAutoMatchPlugin() {}
 
     void handleSay(const CCommand& command, bool isToAll) {
-        assert(command.ArgC() == 2, "Invalid number of arguments to `say` command");
+        sassert(command.ArgC() == 2, "Invalid number of arguments to `say` command");
 
         std::string line(command.Arg(1));
         trim(line);
@@ -531,15 +531,15 @@ public:
         return iserver->GetName();
     }
 
-    std::vector<IPlayer *> team1Players() const override {
+    std::vector<IPlayer *> team1Players() override {
         return getPlayersByTeam<IPlayer>(Team::team1);
     }
 
-    std::vector<IPlayer *> team2Players() const override {
+    std::vector<IPlayer *> team2Players() override {
         return getPlayersByTeam<IPlayer>(Team::team2);
     }
 
-    std::vector<IPlayer *> nonTeamPlayers() const override {
+    std::vector<IPlayer *> nonTeamPlayers() override {
         return getPlayersByTeam<IPlayer>(Team::other);
     }
 
@@ -572,10 +572,10 @@ public:
 
     // Accessors
     Player& getPlayerByID(int id) {
-        assert(0 <= id && id < MAX_PLAYERS, "Player ID out of range");
+        sassert(0 <= id && id < MAX_PLAYERS, "Player ID out of range");
 
         auto& p = connected_players[id - 1];
-        assert(p.isValid(), "Player not valid");
+        sassert(p.isValid(), "Player not valid");
         return p;
     }
 
@@ -628,8 +628,6 @@ public:
     }
 
     int getPlayerCount() { return player_count; }
-
-private:
 };
 
 // Notification of registration confirmation complete

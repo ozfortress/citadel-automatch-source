@@ -11,7 +11,7 @@
 #include <functional>
 
 template<typename ... Args>
-std::string format(const std::string& formatString, Args ... args) {
+inline std::string format(const std::string& formatString, Args ... args) {
     auto c_formatString = formatString.c_str();
     auto size = snprintf(nullptr, 0, c_formatString, args ...) + 1;
     std::unique_ptr<char[]> buffer(new char[size]);
@@ -20,9 +20,9 @@ std::string format(const std::string& formatString, Args ... args) {
     return std::string(buffer.get(), buffer.get() + size - 1);
 }
 
-#define assert(EXPRESSION, MESSAGE) _assert(EXPRESSION, [&] () { return MESSAGE; }, __FILE__, __LINE__)
+#define sassert(EXPRESSION, MESSAGE) _sassert(EXPRESSION, [&] () { return MESSAGE; }, __FILE__, __LINE__)
 
-void _assert(bool expression, std::function<std::string()> lazyMessage, std::string file, int lineNo);
+void _sassert(bool expression, std::function<std::string()> lazyMessage, std::string file, int lineNo);
 
 // trim from start (in place)
 static inline void ltrim(std::string& s) {

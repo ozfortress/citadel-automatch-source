@@ -17,19 +17,19 @@ namespace citadel {
             ErrorCallback onError) {
         // TODO: Player steamIDs
         std::string url = format(
-            "%s/api/v1/auto_match/find?invoker=%"PRIu64"&players[]=%"PRIu64"", endpoint.c_str(), invoker->getSteamID().value, invoker->getSteamID().value);
+            "%s/api/v1/auto_match/find?invoker=%" PRIu64 "&players[]=%" PRIu64 "", endpoint.c_str(), invoker->getSteamID().value, invoker->getSteamID().value);
 
         Requests::Request req(Requests::Method::GET, url);
         requests->request(req,
             [=](const Requests::Response& res) {
                 if (res.json.HasMember("matches")) {
                     auto& matches = res.json["matches"];
-                    assert(matches.IsArray(), "Wrong json type");
+                    sassert(matches.IsArray(), "Wrong json type");
 
                     std::vector<Match> result;
                     for (size_t i = 0; i < matches.Size(); i++) {
                         auto& match = matches[i];
-                        assert(match.IsObject(), "Wrong json type");
+                        sassert(match.IsObject(), "Wrong json type");
 
                         auto& homeTeam = match["home_team"];
                         auto& awayTeam = match["away_team"];

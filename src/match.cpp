@@ -40,7 +40,7 @@ void Match::onPlayerConfirm(std::string& confirmationURL, IPlayer *player) {
 
 void Match::onMatchComplete(uint32_t homeTeamScore, uint32_t awayTeamScore) {
     auto running = std::get_if<Running>(&state);
-    assert(running != nullptr, "Invalid state");
+    sassert(running != nullptr, "Invalid state");
 
     auto result = citadel::IClient::MatchResult(homeTeamScore, awayTeamScore, getLogs());
 

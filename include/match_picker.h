@@ -14,9 +14,9 @@ class MatchPicker {
         Match(const std::shared_ptr<citadel::IClient> c, const citadel::Match& m) : client(c), details(m) {}
     };
 
-    const IPlayer *starter;
+    IPlayer *starter;
+    IGame *game;
     const std::vector<std::shared_ptr<citadel::IClient>> clients;
-    const IGame *game;
 
     size_t clientResults = 0;
     std::vector<Match> matches;
@@ -24,7 +24,7 @@ class MatchPicker {
     void afterAllResults();
 
 public:
-    MatchPicker(const IPlayer *s, const std::vector<std::shared_ptr<citadel::IClient>>& c, IGame *g);
+    MatchPicker(IPlayer *, IGame *, const std::vector<std::shared_ptr<citadel::IClient>>&);
 
     template <class C>
     static std::unique_ptr<MatchPicker> create(
@@ -38,7 +38,7 @@ public:
             clients.push_back(std::make_unique<C>(requests, endpoint));
         }
 
-        return std::make_unique<MatchPicker>(starter, clients, game);
+        return std::make_unique<MatchPicker>(starter, game, clients);
     }
 
     void queryAll(std::vector<IPlayer *>& players);

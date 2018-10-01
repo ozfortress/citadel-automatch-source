@@ -43,9 +43,9 @@ public:
     virtual const std::string_view serverPassword() const = 0;
     virtual const std::string_view serverRConPassword() const = 0;
     virtual const std::string_view serverName() const = 0;
-    virtual std::vector<IPlayer *> team1Players() const = 0;
-    virtual std::vector<IPlayer *> team2Players() const = 0;
-    virtual std::vector<IPlayer *> nonTeamPlayers() const = 0;
+    virtual std::vector<IPlayer *> team1Players() = 0;
+    virtual std::vector<IPlayer *> team2Players() = 0;
+    virtual std::vector<IPlayer *> nonTeamPlayers() = 0;
 
     virtual void resetMatch() = 0;
 

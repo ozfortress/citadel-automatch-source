@@ -66,7 +66,7 @@ static size_t curlWriteCallback(char *ptr, size_t size, size_t nmemb, void *user
 
 static void curlDoRequest(const Requests::RequestEvent& event) {
     CURL *curl = curl_easy_init();
-    assert(curl != nullptr, "Failed curl init");
+    sassert(curl != nullptr, "Failed curl init");
 
     switch (event.req.method) {
         case Requests::Method::GET:
@@ -76,7 +76,7 @@ static void curlDoRequest(const Requests::RequestEvent& event) {
             curl_easy_setopt(curl, CURLOPT_POST, true);
             break;
         default:
-            assert(0, "Unsupported HTTP method");
+            sassert(0, "Unsupported HTTP method");
     }
 
     std::string url;
