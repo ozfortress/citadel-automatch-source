@@ -1,32 +1,52 @@
-#include "plugin.h"
-
 #include <cstdio>
+#include <memory>
 #include <inttypes.h>
 
+#define META_NO_HL2SDK
+#include "iserverplugin.h"
+#include "igameevents.h"
+#include "game/server/iplayerinfo.h"
+#include "game/server/ientityinfo.h"
+#include "edict.h"
+#include "eiface.h"
+#include "steam/steamclientpublic.h"
+#include "ISmmPlugin.h"
+#include "provider/provider_ep2.h"
 #include "irecipientfilter.h"
 #include "KeyValues.h"
 #include "iserver.h"
 #include "iclient.h"
+// Fix std::min and std::max
+#undef min
+#undef max
 
 #include "citadel/client.h"
 #include "utils.h"
+#include "match.h"
+#include "match_picker.h"
+#include "requests.h"
+#include "steam_id.h"
 
-// Nice helper
-#define ENGINE_CALL(func) SH_CALL(engine, &IVEngineServer::func)
+#define VERSION "0.1.0"
 
-// Simple accessor
-CitadelAutoMatchPlugin& CitadelAutoMatchPlugin::instance() { return g_CitadelAutoMatchPlugin; }
+#define MAX_PLAYERS 65
+
+// Metamod stuff
+extern CGlobalVars *gpGlobals;
+PLUGIN_GLOBALVARS();
 
 // Set up sourcehook hooks
-SH_DECL_HOOK2_void(IServerGameClients, ClientCommand, SH_NOATTRIB, 0, edict_t *, const CCommand &);
+SH_DECL_HOOK2_void(IServerGameClients, ClientCommand, SH_NOATTRIB, false, edict_t *, const CCommand &);
 SH_DECL_HOOK1_void(IServerGameClients, SetCommandClient, SH_NOATTRIB, false, int);
 SH_DECL_HOOK1_void(ConCommand, Dispatch, SH_NOATTRIB, false, const CCommand &);
-SH_DECL_HOOK5(IServerGameClients, ClientConnect, SH_NOATTRIB, 0, bool, edict_t *, const char *, const char *, char *, int);
-SH_DECL_HOOK2_void(IServerGameClients, ClientPutInServer, SH_NOATTRIB, 0, edict_t *, const char *);
-SH_DECL_HOOK1_void(IServerGameClients, ClientDisconnect, SH_NOATTRIB, 0, edict_t *);
+SH_DECL_HOOK5(IServerGameClients, ClientConnect, SH_NOATTRIB, false, bool, edict_t *, const char *, const char *, char *, int);
+SH_DECL_HOOK2_void(IServerGameClients, ClientPutInServer, SH_NOATTRIB, false, edict_t *, const char *);
+SH_DECL_HOOK1_void(IServerGameClients, ClientDisconnect, SH_NOATTRIB, false, edict_t *);
+SH_DECL_HOOK5_void(IServerGameDLL, OnQueryCvarValueFinished, SH_NOATTRIB, false, QueryCvarCookie_t, edict_t *, EQueryCvarValueStatus, const char *, const char *);
+SH_DECL_HOOK5_void(IServerPluginCallbacks, OnQueryCvarValueFinished, SH_NOATTRIB, false, QueryCvarCookie_t, edict_t *, EQueryCvarValueStatus, const char *, const char *);
 
 // Some globals
-CitadelAutoMatchPlugin g_CitadelAutoMatchPlugin;
+// CitadelAutoMatchPlugin g_CitadelAutoMatchPlugin;
 // Metamod stuff
 IServerGameDLL *server = NULL;
 IServerGameClients *gameclients = NULL;
@@ -40,13 +60,22 @@ IServer *iserver = NULL;
 ICvar *icvar = NULL;
 CGlobalVars *gpGlobals = NULL;
 
+// Declare vars
+extern ConCommand cas_confirmation_complete;
+extern ConCommand cas_confirmation_progress;
+
+// Pre-declare some stuff
 namespace {
+    // Simple IRecipientFilter implementation. Required for sending messages
     class RecipientFilter: public IRecipientFilter {
+        int count = 0;
+        int recipients[MAX_PLAYERS];
+
     public:
-        virtual bool IsReliable() const override { return true; }
-        virtual bool IsInitMessage() const override { return false; }
-        virtual int GetRecipientCount() const override { return count; }
-        virtual int GetRecipientIndex (int index) const override {
+        bool IsReliable() const override { return true; }
+        bool IsInitMessage() const override { return false; }
+        int GetRecipientCount() const override { return count; }
+        int GetRecipientIndex(int index) const override {
             if (index < 0 || index >= count) {
                 return -1;
             }
@@ -54,378 +83,580 @@ namespace {
         }
 
         void addPlayer(int playerId) {
-            assert(count < 255, "Overflow");
+            assert(count < MAX_PLAYERS, "Overflow");
 
             recipients[count] = playerId;
             count++;
         }
 
-        void addAll() {
-            for (int i = 0; i < iserver->GetNumClients(); i++) {
-                IClient *pClient = iserver->GetClient(i);
-                if ( !pClient || !pClient->IsConnected())
-                    continue;
+        // Define this later
+        void addAll();
+    };
 
-                addPlayer(i + 1);
+    // TODO: Maybe add a single recipient filter
+
+    // TODO: Cache results?
+    int getMessageType(const char * messageName) {
+        char name[255];
+        int size = 0;
+
+        for (int msg_type = 0;; msg_type++) {
+            if (!server->GetUserMessageInfo(msg_type, name, 255, size)) {
+                break;
+            }
+
+            if (strcmp(name, messageName) == 0) {
+                return msg_type;
             }
         }
 
-    private:
-        int count = 0;
-        int recipients[256];
-    };
-}
-
-static int GetMessageType(const char * messageName) {
-    char name[255];
-    int size = 0;
-
-    for (int msg_type = 0;; msg_type++) {
-        if(!server->GetUserMessageInfo(msg_type, name, 255, size))
-            break;
-
-        if (strcmp(name, messageName) == 0)
-            return msg_type;
+        return -1;
     }
 
-    return -1;
-}
+    void sendMessage(IRecipientFilter *filter, const char *message) {
+        bf_write *pBuffer = engine->UserMessageBegin(filter, getMessageType("SayText"));
+        pBuffer->WriteByte(0);
+        pBuffer->WriteString(message);
+        pBuffer->WriteByte(true);
+        engine->MessageEnd();
+    }
 
-static void ShowViewPortPanel(edict_t* pEdict, const char* name, bool bShow, KeyValues* data) {
-    RecipientFilter filter; // the corresponding recipient filter
+    void showViewPortPanel(IRecipientFilter *filter, const char* name, bool bShow, KeyValues* data) {
+        int count = 0;
+        KeyValues *subkey = NULL;
 
-    // pPlayerEdict is a pointer to the edict of a player for which you want this HUD message
-    // to be displayed. There can be several recipients in the filter, don't forget.
-    filter.addPlayer(engine->IndexOfEdict(pEdict));
+        if (data) {
+            subkey = data->GetFirstSubKey();
+            while (subkey) {
+                count++;
+                subkey = subkey->GetNextKey();
+            }
 
-    int count = 0;
-    KeyValues *subkey = NULL;
+            subkey = data->GetFirstSubKey(); // reset
+        }
 
-    if (data) {
-        subkey = data->GetFirstSubKey();
+        bf_write *netmsg = engine->UserMessageBegin(filter, getMessageType("VGUIMenu"));
+
+        netmsg->WriteString(name); // the HUD message itself
+        netmsg->WriteByte(bShow ? 1 : 0); // index of the player this message comes from. "1" means the server.
+        netmsg->WriteByte(count); // I don't know yet the purpose of this byte, it can be 1 or 0
+
+        // write additional data (be careful not more than 192 bytes!)
         while (subkey) {
-            count++;
+            netmsg->WriteString(subkey->GetName()); // the HUD message itself
+            netmsg->WriteString(subkey->GetString()); // the HUD message itself
             subkey = subkey->GetNextKey();
         }
 
-        subkey = data->GetFirstSubKey(); // reset
+        engine->MessageEnd();
     }
-
-    bf_write *netmsg = engine->UserMessageBegin(&filter, GetMessageType("VGUIMenu"));
-
-    netmsg->WriteString(name); // the HUD message itself
-    netmsg->WriteByte(bShow ? 1 : 0); // index of the player this message comes from. "1" means the server.
-    netmsg->WriteByte(count); // I don't know yet the purpose of this byte, it can be 1 or 0
-
-    // write additional data (be carefull not more than 192 bytes!)
-    while (subkey) {
-        netmsg->WriteString(subkey->GetName()); // the HUD message itself
-        netmsg->WriteString(subkey->GetString()); // the HUD message itself
-        subkey = subkey->GetNextKey();
-    }
-
-    engine->MessageEnd();
 }
 
-static void Message(RecipientFilter *filter, const char *message) {
-    bf_write *pBuffer = engine->UserMessageBegin(filter, GetMessageType("SayText"));
-    pBuffer->WriteByte(0);
-    pBuffer->WriteString(message);
-    pBuffer->WriteByte(true);
-    engine->MessageEnd();
-}
+class CitadelAutoMatchPlugin : public ISmmPlugin, public IMetamodListener, public IGame {
+    struct Player final : public IPlayer {
+        int id;
+        edict_t *edict = nullptr;
+        IPlayerInfo *info = nullptr;
+        SteamID steam_id = SteamID::null;
+        bool allow_html_motd = false;
 
-namespace {
-    class Game : public IGame {
-        std::string serverAddress() override {
-            return "";
+        Player() {
+            this->id = -1;
         }
 
-        std::string serverPassword() override {
-            return "";
+        Player(int id) {
+            this->id = id;
         }
 
-        std::string serverRConPassword() override {
-            return "";
+        Player(edict_t *edict) {
+            this->id = engine->IndexOfEdict(edict);
+            this->edict = edict;
+            this->info = playerinfomanager->GetPlayerInfo(edict);
+            printf("Creating player {index: %d, id: %d}\n", engine->IndexOfEdict(edict), this->info->GetUserID());
+            assert(this->info != nullptr, "PlayerInfo is null");
+
+            const CSteamID *cSteamId = engine->GetClientSteamID(edict);
+            assert(cSteamId != nullptr, "CSteamID is null");
+
+            this->steam_id = SteamID(cSteamId->ConvertToUint64());
         }
 
-        std::vector<SteamID> team1Players() override {
-            return std::vector<SteamID>();
+        bool isValid() const {
+            return edict != nullptr;
         }
 
-        std::vector<SteamID> team2Players() override {
-            return std::vector<SteamID>();
+        const std::string_view getName() const override {
+            return std::string_view(engine->GetClientConVarValue(id, "name"));
         }
 
-        void notifyError(std::string message, SteamID target) override {
-            if (target == SteamID::null) {
-                notifyAll("ERROR: " + message);
+        void setName(const std::string_view name) override {
+            std::string str;
+            str.reserve(name.length());
+
+            // Truncate and escape
+            for (size_t i = 0; i < MAX_PLAYER_NAME_LENGTH - 1 && i < name.length(); i++) {
+                const char c = name[i];
+
+                if (c == '"') {
+                    str += "\\\"";
+                } else if (c == '\\') {
+                    str += "\\\\";
+                } else {
+                    str += c;
+                }
+            }
+
+            // Override the con var locally
+            // char *current_name = (char *)engine->GetClientConVarValue(id, "name");
+            // strcpy(current_name, str.c_str());
+
+            // Send the client a set name command
+            engine->ClientCommand(edict, format("name \"%s\"", str.c_str()).c_str());
+        }
+
+        SteamID getSteamID() const override { return steam_id; }
+
+        Team getTeam() const override {
+            auto team_index = info->GetTeamIndex();
+            if (team_index == 2) {
+                return Team::team1;
+            } else if (team_index == 3) {
+                return Team::team2;
             } else {
-                notify(target, "ERROR: " + message);
+                return Team::other;
             }
         }
 
-        void resetMatch() override {
-            g_CitadelAutoMatchPlugin.resetMatch();
-        }
-
-        void notifyAll(std::string message) override {
+        void notify(const std::string_view message) override {
             RecipientFilter filter;
-            filter.addAll();
-            Message(&filter, message.c_str());
+            filter.addPlayer(id);
+
+            sendMessage(&filter, message.data());
         }
 
-        void notify(SteamID player, std::string message) override {
-            const auto *info = g_CitadelAutoMatchPlugin.getPlayerBySteamID(player);
-            if (info == nullptr) {
-                printf("Not opening MOTD due to null info\n");
-                return;
-            }
-            if (info->edict == nullptr) {
-                printf("Not opening MOTD due to null edict\n");
+        void notifyError(const std::string_view message) override {
+            RecipientFilter filter;
+            filter.addPlayer(id);
+
+            sendMessage(&filter, "Citadel AutoMatch Error:");
+            sendMessage(&filter, message.data());
+        }
+
+        void openMOTD(const std::string_view title, const std::string_view url) override {
+            if (!allow_html_motd) {
+                notify("ERROR: You have cl_disablehtmlmotd not set to 0. You can follow this url instead:");
+                notify(url);
                 return;
             }
 
             RecipientFilter filter;
-            filter.addPlayer(engine->IndexOfEdict(info->edict));
-
-            Message(&filter, message.c_str());
-        }
-
-        void openMOTD(SteamID player, std::string title, std::string url) override {
-            assert(player != SteamID::null, "Invalid Steam ID for MOTD");
-
-            printf("Opening MOTD for %"PRIu64" at %s\n", player.value, url.c_str());
-
-            const auto *info = g_CitadelAutoMatchPlugin.getPlayerBySteamID(player);
-            if (info == nullptr) {
-                printf("Not opening MOTD due to null info\n");
-                return;
-            }
-            if (info->edict == nullptr) {
-                printf("Not opening MOTD due to null edict\n");
-                return;
-            }
+            filter.addPlayer(id);
 
             KeyValues* kv = new KeyValues("data");
 
-            kv->SetString("title", title.c_str());
+            kv->SetString("title", title.data());
             kv->SetString("type", "2"); // Type=URL
-            kv->SetString("msg", url.c_str());
-            // TODO: Command on close
-            // kv->SetString("cmd", lpcCmd);// exec this command if panel closed
-            kv->SetInt("cmd", 0);
+            kv->SetString("msg", url.data());
+            kv->SetString("cmd", "cas_player_motd_close");
             kv->SetInt("customsvr", 1);
             kv->SetInt("unload", 1);
 
-            ShowViewPortPanel(info->edict, "info", true, kv);
+            showViewPortPanel(&filter, "info", true, kv);
 
             kv->deleteThis();
         }
     };
+
+    std::shared_ptr<Requests> requests;
+
+    std::unique_ptr<MatchPicker> match_picker;
+    std::unique_ptr<Match> active_match;
+
+    // Keep track of which client called a command last
+    // Use this for determining who ran a "say" command
+    int last_set_command_client_id = -1;
+
+    typedef Player ConnectedPlayers[MAX_PLAYERS];
+
+    // Source sucks, so we need to keep track of players manually
+    int player_count = 0;
+    ConnectedPlayers connected_players;
+
+    CitadelAutoMatchPlugin() {
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            connected_players[i] = Player(i);
+        }
+    }
+    ~CitadelAutoMatchPlugin() {}
+
+    void handleSay(const CCommand& command, bool isToAll) {
+        assert(command.ArgC() == 2, "Invalid number of arguments to `say` command");
+
+        std::string line(command.Arg(1));
+        trim(line);
+
+        auto& player = getPlayerByID(last_set_command_client_id);
+
+        if (line[0] == '!') {
+            handleCommand(&player, line.substr(1));
+        }
+    }
+
+    void handleCommand(Player *player, const std::string& command) {
+        if (active_match) {
+            active_match->onCommand(player, command);
+        } else if (match_picker) {
+            auto match = match_picker->onCommand(player, command);
+
+            if (match) {
+                match_picker.reset();
+                active_match = std::move(match);
+                active_match->start(player);
+            }
+        } else {
+            if (levenshtein_distance(command, "match") <= 2) {
+                startMatch(player);
+            }
+        }
+    }
+
+    void startMatch(Player *starter) {
+        // TODO: CVar
+        std::vector<std::string> endpoints;
+        endpoints.push_back("http://127.0.0.1:3000");
+
+        match_picker = MatchPicker::create<citadel::Client>(starter, requests, endpoints, (IGame *)this);
+
+        auto players = getValidPlayers();
+        // Retarded C++ casting required
+        match_picker->queryAll((std::vector<IPlayer *>&)players);
+    }
+
+public:
+    // Singleton instance
+    static CitadelAutoMatchPlugin& instance() {
+        static CitadelAutoMatchPlugin g_instance;
+
+        return g_instance;
+    }
+
+    // ISmmPlugin
+    const char *GetAuthor() override { return "Benjamin Schaaf"; };
+    const char *GetName() override { return "CitadelAutoMatch"; };
+    const char *GetDescription() override { return "Automagically handle matches for the citadel league framework."; };
+    const char *GetURL() override { return ""; };
+    const char *GetLicense() override { return "GPLv3"; };
+    const char *GetVersion() override { return VERSION; };
+    const char *GetDate() override { return "??"; };
+    const char *GetLogTag() override { return "CAS"; };
+
+    // Called on plugin load
+    bool Load(PluginId id, ISmmAPI *ismm, char *error, size_t maxlen, bool late) override {
+        PLUGIN_SAVEVARS();
+
+        GET_V_IFACE_CURRENT(GetEngineFactory, engine, IVEngineServer, INTERFACEVERSION_VENGINESERVER);
+        GET_V_IFACE_CURRENT(GetServerFactory, serverClients, IServerGameClients, INTERFACEVERSION_SERVERGAMECLIENTS);
+        GET_V_IFACE_CURRENT(GetEngineFactory, gameevents, IGameEventManager2, INTERFACEVERSION_GAMEEVENTSMANAGER2);
+        GET_V_IFACE_CURRENT(GetEngineFactory, helpers, IServerPluginHelpers, INTERFACEVERSION_ISERVERPLUGINHELPERS);
+        GET_V_IFACE_CURRENT(GetEngineFactory, icvar, ICvar, CVAR_INTERFACE_VERSION);
+        GET_V_IFACE_ANY(GetServerFactory, server, IServerGameDLL, INTERFACEVERSION_SERVERGAMEDLL);
+        GET_V_IFACE_ANY(GetServerFactory, gameclients, IServerGameClients, INTERFACEVERSION_SERVERGAMECLIENTS);
+        GET_V_IFACE_ANY(GetServerFactory, playerinfomanager, IPlayerInfoManager, INTERFACEVERSION_PLAYERINFOMANAGER);
+
+        iserver = engine->GetIServer();
+        gpGlobals = ismm->GetCGlobals();
+
+        META_LOG(g_PLAPI, "Starting plugin.");
+
+        /* Load the VSP listener.  This is usually needed for IServerPluginHelpers. */
+        if ((vsp_callbacks = ismm->GetVSPInfo(NULL)) == NULL)
+        {
+            ismm->AddListener(this, this);
+            ismm->EnableVSPListener();
+        }
+
+        printf("!!!!!!!!!!! GameDLLVersion = %d\n", ismm->GetGameDLLVersion());
+
+        // OnVPSListening won't get called if it's already there
+        if (vsp_callbacks) {
+            OnVSPListening(vsp_callbacks);
+        }
+
+        // Player events
+        SH_ADD_HOOK_MEMFUNC(IServerGameClients, ClientCommand, gameclients, this, &CitadelAutoMatchPlugin::onClientCommand, false);
+        SH_ADD_HOOK_MEMFUNC(IServerGameClients, SetCommandClient, serverClients, this, &CitadelAutoMatchPlugin::onSetCommandClient, false);
+        SH_ADD_HOOK_MEMFUNC(ConCommand, Dispatch, icvar->FindCommand("say"), this, &CitadelAutoMatchPlugin::onSay, false);
+        SH_ADD_HOOK_MEMFUNC(ConCommand, Dispatch, icvar->FindCommand("say_team"), this, &CitadelAutoMatchPlugin::onSayTeam, false);
+        SH_ADD_HOOK_MEMFUNC(IServerGameDLL, OnQueryCvarValueFinished, server, this, &CitadelAutoMatchPlugin::onQueryCvarValueFinished, false);
+
+        // Server events
+        SH_ADD_HOOK_MEMFUNC(IServerGameClients, ClientConnect, serverClients, this, &CitadelAutoMatchPlugin::onClientConnect, false);
+        SH_ADD_HOOK_MEMFUNC(IServerGameClients, ClientPutInServer, serverClients, this, &CitadelAutoMatchPlugin::onClientPutInServer, true);
+        SH_ADD_HOOK_MEMFUNC(IServerGameClients, ClientDisconnect, serverClients, this, &CitadelAutoMatchPlugin::onClientDisconnect, false);
+
+        // Commands
+        icvar->RegisterConCommand(&cas_confirmation_complete);
+        icvar->RegisterConCommand(&cas_confirmation_progress);
+
+        META_LOG(g_PLAPI, "CitadelAutoMatchPlugin loaded\n");
+        Warning("Yo, Merry Christmas\n");
+
+        requests = std::make_shared<Requests>();
+
+        return true;
+    }
+
+    bool Unload(char *error, size_t maxlen) override {
+        SH_REMOVE_HOOK_MEMFUNC(IServerGameClients, ClientCommand, gameclients, this, &CitadelAutoMatchPlugin::onClientCommand, false);
+        SH_REMOVE_HOOK_MEMFUNC(IServerGameClients, SetCommandClient, serverClients, this, &CitadelAutoMatchPlugin::onSetCommandClient, false);
+        SH_REMOVE_HOOK_MEMFUNC(ConCommand, Dispatch, icvar->FindCommand("say"), this, &CitadelAutoMatchPlugin::onSay, false);
+        SH_REMOVE_HOOK_MEMFUNC(ConCommand, Dispatch, icvar->FindCommand("say_team"), this, &CitadelAutoMatchPlugin::onSayTeam, false);
+        SH_REMOVE_HOOK_MEMFUNC(IServerGameClients, ClientConnect, serverClients, this, &CitadelAutoMatchPlugin::onClientConnect, false);
+        SH_REMOVE_HOOK_MEMFUNC(IServerGameClients, ClientPutInServer, serverClients, this, &CitadelAutoMatchPlugin::onClientPutInServer, true);
+        SH_REMOVE_HOOK_MEMFUNC(IServerGameClients, ClientDisconnect, serverClients, this, &CitadelAutoMatchPlugin::onClientDisconnect, false);
+        SH_REMOVE_HOOK_MEMFUNC(IServerGameDLL, OnQueryCvarValueFinished, server, this, &CitadelAutoMatchPlugin::onQueryCvarValueFinished, false);
+
+        icvar->UnregisterConCommand(&cas_confirmation_complete);
+        icvar->UnregisterConCommand(&cas_confirmation_progress);
+
+        if (vsp_callbacks) {
+            SH_REMOVE_HOOK_MEMFUNC(IServerPluginCallbacks, OnQueryCvarValueFinished, vsp_callbacks, this, &CitadelAutoMatchPlugin::onQueryCvarValueFinished, false);
+        }
+
+        requests = nullptr;
+
+        return true;
+    }
+
+    // IMetamodListener
+    void OnVSPListening(IServerPluginCallbacks *iface) override {
+        vsp_callbacks = iface;
+
+        SH_ADD_HOOK_MEMFUNC(IServerPluginCallbacks, OnQueryCvarValueFinished, vsp_callbacks, this, &CitadelAutoMatchPlugin::onQueryCvarValueFinished, false);
+    }
+
+    // Source Hooks
+    void onClientCommand(edict_t *pEntity, const CCommand& args) {}
+
+    void onSetCommandClient(int client_index) {
+        printf("Pre-command client %d\n", client_index);
+
+        last_set_command_client_id = client_index + 1;
+    }
+
+    void onSay(const CCommand& args) { handleSay(args, true); }
+
+    void onSayTeam(const CCommand& args) { handleSay(args, false); }
+
+    bool onClientConnect(edict_t *edict, const char *name, const char *address, char *reject, int maxrejectlen) {
+        // TODO: Rejection logic?
+    }
+
+    void onClientPutInServer(edict_t * edict, const char * name) {
+        Player player(edict);
+
+        // Safely handle if client is still "connected"
+        if (connected_players[player.id].isValid()) {
+            onClientDisconnect(connected_players[player.id].edict);
+        }
+
+        player_count++;
+        connected_players[player.id - 1] = player;
+
+        // Query for cl_disablehtmlmod. Maybe do this for every openMOTD in-case it changes?
+        helpers->StartQueryCvarValue(edict, "cl_disablehtmlmotd");
+
+        printf("%s [%" PRIu64 "] (%d) joined server. Now at %d players.\n", name, player.steam_id.value, player.id, player_count);
+    }
+
+    void onClientDisconnect(edict_t *edict) {
+        auto& player = getPlayer(edict);
+
+        if (player.isValid()) {
+            printf("[%" PRIu64 "] (%d) disconnected. Now at %d players.\n", player.steam_id.value, player.id, player_count);
+
+            player = Player(player.id);
+            player_count--;
+        }
+    }
+
+    void onQueryCvarValueFinished(
+        QueryCvarCookie_t iCookie,
+        edict_t *edict,
+        EQueryCvarValueStatus status,
+        const char *name,
+        const char *value) {
+
+        printf("!!!!!!!!!! OnQueryCvarValueFinished\n");
+        if (status != eQueryCvarValueStatus_ValueIntact) {
+            return;
+        }
+
+        printf("Received CVar %s = %s\n", name, value);
+        if (strcmp(name, "cl_disablehtmlmotd") != 0) {
+            return;
+        }
+
+        auto& player = getPlayer(edict);
+        player.allow_html_motd = strcmp(value, "0") == 0;
+    }
+
+    // Commands
+    void onConfirmationComplete() {
+        if (active_match) {
+            active_match->onServerConfirm();
+        }
+    }
+
+    void onConfirmationProgress() {
+        if (active_match) {
+            active_match->onServerConfirmationProgress();
+        }
+    }
+
+    // IGame
+    int serverPort() const override {
+        return iserver->GetUDPPort();
+    }
+
+    const std::string_view serverPassword() const override {
+        return iserver->GetPassword();
+    }
+
+    const std::string_view serverRConPassword() const override {
+        return icvar->FindVar("rcon_password")->GetString();
+    }
+
+    const std::string_view serverName() const override {
+        return iserver->GetName();
+    }
+
+    std::vector<IPlayer *> team1Players() const override {
+        return getPlayersByTeam<IPlayer>(Team::team1);
+    }
+
+    std::vector<IPlayer *> team2Players() const override {
+        return getPlayersByTeam<IPlayer>(Team::team2);
+    }
+
+    std::vector<IPlayer *> nonTeamPlayers() const override {
+        return getPlayersByTeam<IPlayer>(Team::other);
+    }
+
+    void resetMatch() override {
+        printf("Resetting match\n");
+
+        if (active_match) {
+            active_match = nullptr;
+        } else if (match_picker) {
+            match_picker = nullptr;
+        }
+
+        notifyAll("Match has been reset.");
+    }
+
+    void notifyAll(const std::string_view message) override {
+        RecipientFilter filter;
+        filter.addAll();
+
+        sendMessage(&filter, message.data());
+    }
+
+    void notifyAllError(const std::string_view message) override {
+        RecipientFilter filter;
+        filter.addAll();
+
+        sendMessage(&filter, "Citadel AutoMatch Error:");
+        sendMessage(&filter, message.data());
+    }
+
+    // Accessors
+    Player& getPlayerByID(int id) {
+        assert(0 <= id && id < MAX_PLAYERS, "Player ID out of range");
+
+        auto& p = connected_players[id - 1];
+        assert(p.isValid(), "Player not valid");
+        return p;
+    }
+
+    // Player& getPlayerByIndex(int index) {
+    //     auto *info = iserver->GetClient(index);
+    //     return getPlayerByID(info->GetUserID());
+    // }
+
+    Player& getPlayer(edict_t *edict) {
+        auto id = engine->IndexOfEdict(edict);
+        return getPlayerByID(id);
+    }
+
+    Player *getPlayerBySteamID(SteamID id) {
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            auto *player = &connected_players[i];
+
+            if (player->steam_id == id) {
+                return player;
+            }
+        }
+
+        return nullptr;
+    }
+
+    ConnectedPlayers& getPlayers() {
+        return connected_players;
+    }
+
+    template<typename T = Player>
+    std::vector<T *> getValidPlayers() {
+        std::vector<T *> players;
+        for (auto& player : connected_players) {
+            if (player.isValid()) {
+                players.push_back(&player);
+            }
+        }
+        return players;
+    }
+
+    template<typename T = Player>
+    std::vector<T *> getPlayersByTeam(Team team) {
+        std::vector<T *> players;
+        for (auto &player : connected_players) {
+            if (player.isValid() && player.getTeam() == team) {
+                players.push_back(&player);
+            }
+        }
+        return players;
+    }
+
+    int getPlayerCount() { return player_count; }
+
+private:
+};
+
+// Notification of registration confirmation complete
+static void onConfirmationComplete(const CCommand &args) {
+    CitadelAutoMatchPlugin::instance().onConfirmationComplete();
 }
+
+ConCommand cas_confirmation_complete("cas_confirmation_complete", onConfirmationComplete , "", 0);
+
+// Notification of registration confirmation progress
+static void onConfirmationProgress(const CCommand &args) {
+    CitadelAutoMatchPlugin::instance().onConfirmationProgress();
+}
+
+ConCommand cas_confirmation_progress("cas_confirmation_progress", onConfirmationProgress , "", 0);
+
 
 // Set up metamod plugin
-PLUGIN_EXPOSE(CitadelAutoMatchPlugin, g_CitadelAutoMatchPlugin);
+PLUGIN_EXPOSE(CitadelAutoMatchPlugin, CitadelAutoMatchPlugin::instance());
 
-CitadelAutoMatchPlugin::CitadelAutoMatchPlugin() {}
-CitadelAutoMatchPlugin::~CitadelAutoMatchPlugin() {}
-
-bool CitadelAutoMatchPlugin::Load(PluginId id, ISmmAPI *ismm, char *error, size_t maxlen, bool late) {
-    PLUGIN_SAVEVARS();
-
-    GET_V_IFACE_CURRENT(GetEngineFactory, engine, IVEngineServer, INTERFACEVERSION_VENGINESERVER);
-    GET_V_IFACE_CURRENT(GetServerFactory, serverClients, IServerGameClients, INTERFACEVERSION_SERVERGAMECLIENTS);
-    GET_V_IFACE_CURRENT(GetEngineFactory, gameevents, IGameEventManager2, INTERFACEVERSION_GAMEEVENTSMANAGER2);
-    GET_V_IFACE_CURRENT(GetEngineFactory, helpers, IServerPluginHelpers, INTERFACEVERSION_ISERVERPLUGINHELPERS);
-    GET_V_IFACE_CURRENT(GetEngineFactory, icvar, ICvar, CVAR_INTERFACE_VERSION);
-    GET_V_IFACE_ANY(GetServerFactory, server, IServerGameDLL, INTERFACEVERSION_SERVERGAMEDLL);
-    GET_V_IFACE_ANY(GetServerFactory, gameclients, IServerGameClients, INTERFACEVERSION_SERVERGAMECLIENTS);
-    GET_V_IFACE_ANY(GetServerFactory, playerinfomanager, IPlayerInfoManager, INTERFACEVERSION_PLAYERINFOMANAGER);
-
-    iserver = engine->GetIServer();
-    gpGlobals = ismm->GetCGlobals();
-
-    META_LOG(g_PLAPI, "Starting plugin.");
-
-    /* Load the VSP listener.  This is usually needed for IServerPluginHelpers. */
-    if ((vsp_callbacks = ismm->GetVSPInfo(NULL)) == NULL)
-    {
-        ismm->AddListener(this, this);
-        ismm->EnableVSPListener();
-    }
-
-    // Player events
-    SH_ADD_HOOK_MEMFUNC(IServerGameClients, ClientCommand, gameclients, this, &CitadelAutoMatchPlugin::onClientCommand, false);
-    SH_ADD_HOOK_MEMFUNC(IServerGameClients, SetCommandClient, serverClients, this, &CitadelAutoMatchPlugin::onSetCommandClient, false);
-    SH_ADD_HOOK_MEMFUNC(ConCommand, Dispatch, icvar->FindCommand("say"), this, &CitadelAutoMatchPlugin::onSay, false);
-    SH_ADD_HOOK_MEMFUNC(ConCommand, Dispatch, icvar->FindCommand("say_team"), this, &CitadelAutoMatchPlugin::onSayTeam, false);
-
-    // Server events
-    SH_ADD_HOOK_MEMFUNC(IServerGameClients, ClientConnect, serverClients, this, &CitadelAutoMatchPlugin::onClientConnect, false);
-    SH_ADD_HOOK_MEMFUNC(IServerGameClients, ClientPutInServer, serverClients, this, &CitadelAutoMatchPlugin::onClientPutInServer, true);
-    SH_ADD_HOOK_MEMFUNC(IServerGameClients, ClientDisconnect, serverClients, this, &CitadelAutoMatchPlugin::onClientDisconnect, false);
-
-    META_LOG(g_PLAPI, "CitadelAutoMatchPlugin loaded\n");
-    Warning("Yo, Merry Christmas\n");
-
-    requests = std::make_shared<Requests>();
-    if (!game) game = std::make_shared<Game>();
-
-    return true;
-}
-
-bool CitadelAutoMatchPlugin::Unload(char *error, size_t maxlen) {
-    SH_REMOVE_HOOK_MEMFUNC(IServerGameClients, ClientCommand, gameclients, this, &CitadelAutoMatchPlugin::onClientCommand, false);
-    SH_REMOVE_HOOK_MEMFUNC(IServerGameClients, SetCommandClient, serverClients, this, &CitadelAutoMatchPlugin::onSetCommandClient, false);
-    SH_REMOVE_HOOK_MEMFUNC(ConCommand, Dispatch, icvar->FindCommand("say"), this, &CitadelAutoMatchPlugin::onSay, false);
-    SH_REMOVE_HOOK_MEMFUNC(ConCommand, Dispatch, icvar->FindCommand("say_team"), this, &CitadelAutoMatchPlugin::onSayTeam, false);
-    SH_REMOVE_HOOK_MEMFUNC(IServerGameClients, ClientConnect, serverClients, this, &CitadelAutoMatchPlugin::onClientConnect, false);
-    SH_REMOVE_HOOK_MEMFUNC(IServerGameClients, ClientPutInServer, serverClients, this, &CitadelAutoMatchPlugin::onClientPutInServer, true);
-    SH_REMOVE_HOOK_MEMFUNC(IServerGameClients, ClientDisconnect, serverClients, this, &CitadelAutoMatchPlugin::onClientDisconnect, false);
-
-    requests = nullptr;
-
-    return true;
-}
-
-void CitadelAutoMatchPlugin::OnVSPListening(IServerPluginCallbacks *iface) {
-    vsp_callbacks = iface;
-}
-
-static void logCommand(const CCommand& command) {
-    for (size_t i = 0; i < command.ArgC(); i++) {
-        Warning(format("%d %s\n", i, command.Arg(i)).c_str());
-    }
-}
-
-void CitadelAutoMatchPlugin::onClientCommand(edict_t *pEdict, const CCommand& args) {
-    logCommand(args);
-}
-
-void CitadelAutoMatchPlugin::onSetCommandClient(int client) {
-    lastClient = client + 1;
-}
-
-void CitadelAutoMatchPlugin::onSay(const CCommand& args) {
-    handleSay(args, true);
-}
-
-void CitadelAutoMatchPlugin::onSayTeam(const CCommand& args) {
-    handleSay(args, false);
-}
-
-void CitadelAutoMatchPlugin::handleSay(const CCommand& command, bool isToAll) {
-    assert(command.ArgC() == 2, "Invalid number of arguments to `say` command");
-
-    std::string line(command.Arg(1));
-    trim(line);
-
-    auto& player = players[lastClient];
-
-    printf("Player is connected: %d\n", player.connected);
-
-    if (line[0] == '!') {
-        handleCommand(player.steamId, line.substr(1));
-    }
-}
-
-void CitadelAutoMatchPlugin::handleCommand(const SteamID steamId, const std::string& command) {
-    if (activeMatch) {
-        activeMatch->onCommand(steamId, command);
-    } else if (matchPicker) {
-        auto match = matchPicker->onCommand(steamId, command);
-
-        if (match) {
-            matchPicker = nullptr;
-            activeMatch = std::move(match);
-            activeMatch->start(steamId);
-        }
-    } else {
-        if (levenshtein_distance(command, "match") <= 2) {
-            startMatch(steamId);
+// Define some co-dependent things
+namespace {
+    void RecipientFilter::addAll() {
+        for (auto& player : CitadelAutoMatchPlugin::instance().getPlayers()) {
+            if (player.isValid()) {
+                addPlayer(player.id);
+            }
         }
     }
-}
-
-void CitadelAutoMatchPlugin::startMatch(const SteamID starter) {
-    // TODO: CVar
-    std::vector<std::string> endpoints;
-    endpoints.push_back("http://127.0.0.1:3000");
-
-    matchPicker = MatchPicker::create<citadel::Client>(starter, requests, endpoints, game);
-
-    // TODO: Get players
-    std::vector<SteamID> players;
-    players.push_back(starter);
-
-    matchPicker->queryAll(players);
-}
-
-bool CitadelAutoMatchPlugin::onClientConnect(edict_t *pEdict, const char *pszName, const char *pszAddress, char *reject, int maxrejectlen) {
-    int clientIndex = engine->IndexOfEdict(pEdict);
-    PlayerInfo *player = &players[clientIndex];
-
-    // Safely handle if client is still "connected"
-    if (player->connected) {
-        onClientDisconnect(player->edict);
-    }
-
-    // Get the SteamID
-    const CSteamID *cSteamId = engine->GetClientSteamID(pEdict);
-    auto steamId = SteamID(cSteamId->ConvertToUint64());
-
-    player->Init(pEdict, steamId);
-
-    playerCount++;
-
-    printf("%s - %s [%"PRIu64"] (%d) joined server. Now at %d players.\n", pszName, pszAddress, player->steamId.value, clientIndex, playerCount);
-}
-
-void CitadelAutoMatchPlugin::onClientPutInServer(edict_t *pEdict, char const *playername) {
-    int clientIndex = engine->IndexOfEdict(pEdict);
-    PlayerInfo *player = &players[clientIndex];
-
-    if (player->connected) {
-        player->info = playerinfomanager->GetPlayerInfo(pEdict);
-    }
-
-    printf("%s connecting\n", playername);
-}
-
-void CitadelAutoMatchPlugin::onClientDisconnect(edict_t *pEdict) {
-    int clientIndex = engine->IndexOfEdict(pEdict);
-    PlayerInfo *player = &players[clientIndex];
-
-    if (player->connected) {
-        playerCount--;
-
-        printf("[%"PRIu64"] (%d) disconnected. Now at %d players.\n", player->steamId.value, clientIndex, playerCount);
-
-        *player = PlayerInfo();
-    }
-}
-
-const CitadelAutoMatchPlugin::PlayerInfo *CitadelAutoMatchPlugin::getPlayerBySteamID(const SteamID steamId) {
-    for (size_t i = 1; i < playerCount + 1; i++) {
-        const auto *info = &players[i];
-
-        if (info->connected && info->steamId == steamId) {
-            return info;
-        }
-    }
-
-    return nullptr;
-}
-
-void CitadelAutoMatchPlugin::resetMatch() {
-    printf("Resetting match\n");
-
-    if (activeMatch) {
-        activeMatch = nullptr;
-    } else if (matchPicker) {
-        matchPicker = nullptr;
-    }
-
-    game->notifyAll("Match has been reset.");
 }

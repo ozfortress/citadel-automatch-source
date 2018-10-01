@@ -1,34 +1,95 @@
 #include "mocks/game.h"
 
-mocks::Game::Game() {}
+namespace mocks {
+    Player::Player(SteamID steam_id, Team team, std::string name)
+        : steam_id(steam_id), team(team), name(name) {
 
-mocks::Game::~Game() {}
+    }
 
-std::string mocks::Game::serverAddress() {
-    return "127.0.0.1";
+    Player::~Player() {}
+
+    const std::string_view Player::getName() const {
+        return name;
+    }
+
+    void Player::setName(const std::string_view name) {
+        this->name = name;
+    }
+
+    SteamID Player::getSteamID() const {
+        return steam_id;
+    }
+
+    Team Player::getTeam() const {
+        return team;
+    }
+
+    void Player::notify(const std::string_view) {}
+
+    void Player::notifyError(const std::string_view) {}
+
+    void Player::openMOTD(const std::string_view title, const std::string_view url) {}
+
+    Game::Game(std::vector<IPlayer *> players) : players(std::move(players)) {}
+
+    Game::Game(std::vector<std::unique_ptr<IPlayer>>& players) {
+        this->players.reserve(players.size());
+        for (auto& player : players) {
+            this->players.push_back(player.get());
+        }
+    }
+
+    Game::~Game() {}
+
+    int Game::serverPort() const {
+        return 1234;
+    }
+
+    const std::string_view Game::serverPassword() const {
+        return "Password";
+    }
+
+    const std::string_view Game::serverRConPassword() const {
+        return "RConPassword";
+    }
+
+    const std::string_view Game::serverName() const {
+        return "Test Server";
+    }
+
+    std::vector<IPlayer *> Game::team1Players() const {
+        std::vector<IPlayer *> players;
+        for (auto player : this->players) {
+            if (player->getTeam() == Team::team1) {
+                players.push_back(player);
+            }
+        }
+        return players;
+    }
+
+    std::vector<IPlayer *> Game::team2Players() const {
+        std::vector<IPlayer *> players;
+        for (auto player : this->players) {
+            if (player->getTeam() == Team::team2) {
+                players.push_back(player);
+            }
+        }
+        return players;
+    }
+
+    std::vector<IPlayer *> Game::nonTeamPlayers() const {
+        std::vector<IPlayer *> players;
+        for (auto player : this->players) {
+            if (player->getTeam() == Team::other) {
+                players.push_back(player);
+            }
+        }
+        return players;
+    }
+
+    void Game::resetMatch() {}
+
+    void Game::notifyAll(std::string_view) {}
+
+    void Game::notifyAllError(std::string_view) {}
 }
-
-std::string mocks::Game::serverPassword() {
-    return "Password";
-}
-
-std::string mocks::Game::serverRConPassword() {
-    return "RConPassword";
-}
-
-std::vector<SteamID> mocks::Game::team1Players() {
-    return team1;
-}
-
-std::vector<SteamID> mocks::Game::team2Players() {
-    return team2;
-}
-
-void mocks::Game::notifyError(std::string message, SteamID target) {}
-
-void mocks::Game::resetMatch() {}
-
-void mocks::Game::notifyAll(std::string message) {}
-void mocks::Game::notify(SteamID id, std::string message) {}
-
-void mocks::Game::openMOTD(SteamID id, std::string title, std::string url) {}

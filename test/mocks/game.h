@@ -1,28 +1,50 @@
 #pragma once
 
+#include <memory>
+
 #include "igame.h"
 
 namespace mocks {
+    class Player : public IPlayer {
+    public:
+        SteamID steam_id;
+        Team team;
+        std::string name;
+
+        Player(SteamID steam_id = SteamID::null, Team team = Team::other, std::string name = "Player");
+        ~Player();
+
+        const std::string_view getName() const override;
+        void setName(const std::string_view) override;
+        SteamID getSteamID() const override;
+        Team getTeam() const override;
+
+        void notify(const std::string_view) override;
+        void notifyError(const std::string_view) override;
+
+        void openMOTD(const std::string_view title, const std::string_view url) override;
+    };
+
     class Game : public IGame {
     public:
-        std::vector<SteamID> team1;
-        std::vector<SteamID> team2;
+        std::vector<IPlayer *> players;
 
-        Game();
+        Game(std::vector<IPlayer *>);
+        Game(std::vector<std::unique_ptr<IPlayer>>&);
         ~Game();
 
-        std::string serverAddress() override;
-        std::string serverPassword() override;
-        std::string serverRConPassword() override;
-        std::vector<SteamID> team1Players() override;
-        std::vector<SteamID> team2Players() override;
+        int serverPort() const override;
+        const std::string_view serverPassword() const override;
+        const std::string_view serverRConPassword() const override;
+        const std::string_view serverName() const override;
 
-        void notifyError(std::string message, SteamID target) override;
+        std::vector<IPlayer *> team1Players() const override;
+        std::vector<IPlayer *> team2Players() const override;
+        std::vector<IPlayer *> nonTeamPlayers() const override;
+
         void resetMatch() override;
 
-        void notifyAll(std::string) override;
-        void notify(SteamID, std::string) override;
-
-        void openMOTD(SteamID, std::string, std::string) override;
+        void notifyAll(std::string_view) override;
+        void notifyAllError(std::string_view) override;
     };
 }

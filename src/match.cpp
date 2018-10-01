@@ -7,7 +7,7 @@
 
 #include "utils.h"
 
-Match::Match(std::shared_ptr<IGame> game, std::shared_ptr<citadel::IClient> citadel, const citadel::Match& match)
+Match::Match(IGame *game, std::shared_ptr<citadel::IClient> citadel, const citadel::Match& match)
         : game(std::move(game))
         , citadel(std::move(citadel))
         , matchInfo(match) {}
@@ -34,8 +34,8 @@ std::string Match::getLogs() {
     return joined.str();
 }
 
-void Match::onPlayerConfirm(std::string& confirmationURL, SteamID player) {
-    game->openMOTD(player, "AutoMatch Confirmation", confirmationURL);
+void Match::onPlayerConfirm(std::string& confirmationURL, IPlayer *player) {
+    player->openMOTD("AutoMatch Confirmation", confirmationURL);
 }
 
 void Match::onMatchComplete(uint32_t homeTeamScore, uint32_t awayTeamScore) {
@@ -50,16 +50,16 @@ void Match::onMatchComplete(uint32_t homeTeamScore, uint32_t awayTeamScore) {
         result,
         [=]() {
             // TODO: Kill match
-            game->notifyError(format("Submitted match result."));
+            game->notifyAllError(format("Submitted match result."));
         },
         [=](int32_t code, std::string error) {
             // TODO: Retry
-            game->notifyError(format("Failed to submit match. Get error %d with message '%s'", code, error.c_str()));
+            game->notifyAllError(format("Failed to submit match. Get error %d with message '%s'", code, error.c_str()));
         }
     );
 }
 
-void Match::start(SteamID starter) {
+void Match::start(IPlayer *starter) {
     printf("Registering plugin (%d, %d)\n", game == nullptr, citadel == nullptr);
 
     game->notifyAll(format("Starting match %s vs %s", matchInfo.homeTeam.name.c_str(), matchInfo.awayTeam.name.c_str()));
@@ -69,8 +69,7 @@ void Match::start(SteamID starter) {
     citadel->registerPlugin(
         matchInfo.id,
         starter,
-        game->serverAddress(),
-        game->serverPassword(),
+        game->serverPort(),
         game->serverRConPassword(),
         game->team1Players(),
         game->team2Players(),
@@ -80,13 +79,13 @@ void Match::start(SteamID starter) {
             game->notifyAll("Plugin registered. One player on each team please type !confirm and follow instructions to start the match.");
         },
         [=](int32_t code, std::string error) {
-            game->notifyError(format("Failed to register plugin for match. Got error %d with message '%s'", code, error.c_str()));
+            game->notifyAllError(format("Failed to register plugin for match. Got error %d with message '%s'", code, error.c_str()));
             game->resetMatch();
         }
     );
 }
 
-bool Match::onCommand(SteamID player, std::string line) {
+bool Match::onCommand(IPlayer *player, std::string line) {
     trim(line);
 
     auto handled = false;
@@ -120,16 +119,39 @@ bool Match::onCommand(SteamID player, std::string line) {
 // TODO: Call this somehow
 void Match::onServerConfirm() {
     auto confirmationPending = std::get_if<ConfirmationPending>(&state);
-    assert(confirmationPending != nullptr, "Invalid state");
+    if (confirmationPending == nullptr) {
+        return;
+    }
 
     citadel->registerMatch(
         matchInfo.id,
         confirmationPending->registrationToken,
         [=](std::string matchToken) {
             state = Running(matchToken);
+
+            game->notifyAll(
+                format("This server has been authorized to manage the match: %s vs %s\n",
+                       matchInfo.homeTeam.name.c_str(), matchInfo.awayTeam.name.c_str()));
+            game->notifyAll("Good luck and have fun!"); // TODO: Actual match management
         },
         [=](int32_t code, std::string error) {
-            // TODO
+            // if (code == 400) {
+            //     game->notifyAllError("")
+            //     return;
+            // }
+
+            game->notifyAllError(format("Failed to register plugin for match. Got error %d with message '%s'", code, error.c_str()));
+            game->resetMatch();
         }
     );
+}
+
+void Match::onServerConfirmationProgress() {
+    auto confirmationPending = std::get_if<ConfirmationPending>(&state);
+    if (confirmationPending == nullptr) {
+        return;
+    }
+
+    // TODO: Request status update
+    game->notifyAll("Registration has progressed\n");
 }

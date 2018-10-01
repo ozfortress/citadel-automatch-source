@@ -36,26 +36,27 @@ public:
 private:
     std::vector<std::string> logs;
 
-    std::shared_ptr<IGame> game;
+    IGame *game;
     std::shared_ptr<citadel::IClient> citadel;
     citadel::Match matchInfo;
 
     void log(std::string);
     std::string getLogs();
 
-    void onPlayerConfirm(std::string &, SteamID);
+    void onPlayerConfirm(std::string &, IPlayer *);
 
     void onMatchComplete(uint32_t homeTeamScore, uint32_t awayTeamScore);
 
 public:
     State state = Initializing();
 
-    Match(std::shared_ptr<IGame>, std::shared_ptr<citadel::IClient>, const citadel::Match& match);
+    Match(IGame *, std::shared_ptr<citadel::IClient>, const citadel::Match& match);
     ~Match();
 
-    void start(SteamID starter);
+    void start(IPlayer *starter);
 
-    bool onCommand(SteamID, std::string);
+    bool onCommand(IPlayer *, std::string);
 
     void onServerConfirm();
+    void onServerConfirmationProgress();
 };

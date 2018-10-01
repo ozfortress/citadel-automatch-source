@@ -3,35 +3,35 @@
 #include "utils.h"
 
 MatchPicker::MatchPicker(
-        const SteamID steamId,
+        const IPlayer *starter,
         const std::vector<std::shared_ptr<citadel::IClient>>& clients,
-        const std::shared_ptr<IGame> game)
-        : starter(steamId), clients(clients), game(game) {}
+        IGame *game)
+        : starter(starter), clients(clients), game(game) {}
 
 void MatchPicker::afterAllResults() {
     printf("Match picker completed with %zu matches\n", matches.size());
 
     if (matches.size() == 0) {
-        game->notifyError("There are no pending matches for the players in this server.", starter);
+        starter->notifyError("There are no pending matches for the players in this server.");
         game->resetMatch();
         return;
     }
 
     // TODO: Improve message
-    game->notifyAll("A match has been requested to start.");
+    game->notifyAll("A match has been requested to start.\n\n");
 
-    game->notify(starter, "Please type `!N` where N is one of:");
+    starter->notify("Please type `!N` where N is one of:");
 
     for (size_t i = 0; i < matches.size(); i++) {
         auto& match = matches[i];
         auto& homeTeam = match.details.homeTeam;
         auto& awayTeam = match.details.awayTeam;
 
-        game->notify(starter, format("%zu. %s vs %s", i + 1, homeTeam.name.c_str(), awayTeam.name.c_str()));
+        starter->notify(format("%zu. %s vs %s", i + 1, homeTeam.name.c_str(), awayTeam.name.c_str()));
     }
 }
 
-void MatchPicker::queryAll(std::vector<SteamID>& players) {
+void MatchPicker::queryAll(std::vector<IPlayer *>& players) {
     for (auto& client : clients) {
         client->findMatchForPlayers(
             starter,
@@ -56,14 +56,14 @@ void MatchPicker::queryAll(std::vector<SteamID>& players) {
     }
 }
 
-std::unique_ptr<Match> MatchPicker::onCommand(SteamID id, std::string command) {
-    if (id != starter) return nullptr;
+std::unique_ptr<Match> MatchPicker::onCommand(IPlayer *player, std::string command) {
+    if (player != starter) return nullptr;
     if (clientResults != clients.size()) return nullptr;
 
     int32_t matchIndex = atoi(command.c_str());
 
     if (matchIndex <= 0 || matchIndex > matches.size()) {
-        game->notify(starter, "Please select a valid match.");
+        starter->notify("Please select a valid match.");
         // TODO: Send an error
 
         return nullptr;

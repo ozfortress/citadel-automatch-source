@@ -11,12 +11,13 @@ namespace citadel {
     Client::~Client() {}
 
     void Client::findMatchForPlayers(
-            SteamID invokerSteamID,
-            std::vector<SteamID> playerSteamIDs,
+            IPlayer *invoker,
+            std::vector<IPlayer *> players,
             std::function<void (std::vector<Match> matches)> onResult,
             ErrorCallback onError) {
+        // TODO: Player steamIDs
         std::string url = format(
-            "%s/api/v1/auto_match/find?invoker=%"PRIu64"&players[]=%"PRIu64"", endpoint.c_str(), invokerSteamID.value, invokerSteamID.value);
+            "%s/api/v1/auto_match/find?invoker=%"PRIu64"&players[]=%"PRIu64"", endpoint.c_str(), invoker->getSteamID().value, invoker->getSteamID().value);
 
         Requests::Request req(Requests::Method::GET, url);
         requests->request(req,
@@ -58,19 +59,20 @@ namespace citadel {
 
     void Client::registerPlugin(
             uint64_t matchId,
-            SteamID starter,
-            std::string address,
-            std::string password,
-            std::string rconPassword,
-            std::vector<SteamID> team1,
-            std::vector<SteamID> team2,
+            IPlayer *starter,
+            int port,
+            std::string_view password,
+            std::vector<IPlayer *> team1,
+            std::vector<IPlayer *> team2,
             std::function<void (std::string registrationToken, std::string confirmationURL)> onResult,
             ErrorCallback onError) {
         std::string url = endpoint + "/api/v1/auto_match/register";
 
         std::vector<std::pair<std::string, std::string>> params;
         params.push_back(std::pair("id", std::to_string(matchId)));
-        params.push_back(std::pair("invoker", std::to_string(starter.value)));
+        params.push_back(std::pair("invoker", std::to_string(starter->getSteamID().value)));
+        params.push_back(std::pair("port", std::to_string(port)));
+        params.push_back(std::pair("password", std::string(password)));
         Requests::Request req(Requests::Method::POST, url, params);
 
         requests->request(req,
@@ -98,7 +100,31 @@ namespace citadel {
             std::string registrationToken,
             std::function<void (std::string matchToken)> onResult,
             ErrorCallback onError) {
-        // TODO
+        std::string url = endpoint + "/api/v1/auto_match/authorize";
+
+        std::vector<std::pair<std::string, std::string>> params;
+        params.push_back(std::pair("id", std::to_string(matchId)));
+        params.push_back(std::pair("token", registrationToken));
+        Requests::Request req(Requests::Method::POST, url, params);
+
+        requests->request(req,
+            [=](const Requests::Response& res) {
+                if (!res.json.HasMember("authorization")) {
+                    if (res.json.HasMember("errors")) {
+                        onError(res.code, res.json["errors"][0].GetString());
+                        return;
+                    }
+                    onError(0, "Internal Error");
+                    return;
+                }
+                auto& authorization = res.json["authorization"];
+
+                std::string token = authorization["token"].GetString();
+                onResult(token);
+            },
+            [=](const std::string& msg) {
+                onError(0, msg);
+            });
     }
 
     void Client::submitMatch(

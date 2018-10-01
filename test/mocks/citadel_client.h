@@ -9,19 +9,18 @@ namespace mocks {
         ~CitadelClient() {}
 
         void findMatchForPlayers(
-            SteamID invokerSteamID,
-            std::vector<SteamID> playerSteamIDs,
+            IPlayer *invoker,
+            std::vector<IPlayer *> players,
             std::function<void (std::vector<citadel::Match> matches)> onResult,
             ErrorCallback onError) override {}
 
         void registerPlugin(
             uint64_t matchId,
-            SteamID starter,
-            std::string address,
-            std::string password,
-            std::string rconPassword,
-            std::vector<SteamID> team1,
-            std::vector<SteamID> team2,
+            IPlayer *starter,
+            int port,
+            std::string_view password,
+            std::vector<IPlayer *> team1,
+            std::vector<IPlayer *> team2,
             std::function<void (std::string registrationToken, std::string confirmationURL)> onResult,
             ErrorCallback onError) override {}
 

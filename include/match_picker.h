@@ -14,9 +14,9 @@ class MatchPicker {
         Match(const std::shared_ptr<citadel::IClient> c, const citadel::Match& m) : client(c), details(m) {}
     };
 
-    const SteamID starter;
+    const IPlayer *starter;
     const std::vector<std::shared_ptr<citadel::IClient>> clients;
-    const std::shared_ptr<IGame> game;
+    const IGame *game;
 
     size_t clientResults = 0;
     std::vector<Match> matches;
@@ -24,24 +24,24 @@ class MatchPicker {
     void afterAllResults();
 
 public:
-    MatchPicker(const SteamID s, const std::vector<std::shared_ptr<citadel::IClient>>& c, const std::shared_ptr<IGame> g);
+    MatchPicker(const IPlayer *s, const std::vector<std::shared_ptr<citadel::IClient>>& c, IGame *g);
 
     template <class C>
     static std::unique_ptr<MatchPicker> create(
-            const SteamID starter,
+            const IPlayer *starter,
             std::shared_ptr<Requests> requests,
             std::vector<std::string> endpoints,
-            const std::shared_ptr<IGame> game) {
+            IGame *game) {
         std::vector<std::shared_ptr<citadel::IClient>> clients;
 
         for (auto& endpoint : endpoints) {
             clients.push_back(std::make_unique<C>(requests, endpoint));
         }
 
-        return std::make_unique<MatchPicker>(starter, clients, std::move(game));
+        return std::make_unique<MatchPicker>(starter, clients, game);
     }
 
-    void queryAll(std::vector<SteamID>& players);
+    void queryAll(std::vector<IPlayer *>& players);
 
-    std::unique_ptr<::Match> onCommand(SteamID, std::string);
+    std::unique_ptr<::Match> onCommand(IPlayer *, std::string);
 };

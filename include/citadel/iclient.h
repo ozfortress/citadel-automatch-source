@@ -6,6 +6,7 @@
 #include <memory>
 #include <functional>
 
+#include "igame.h"
 #include "steam_id.h"
 
 namespace citadel {
@@ -29,19 +30,18 @@ namespace citadel {
         using ErrorCallback = std::function<void (int32_t, std::string)>;
 
         virtual void findMatchForPlayers(
-            SteamID invokerSteamID,
-            std::vector<SteamID> playerSteamIDs,
+            IPlayer *invokerSteamID,
+            std::vector<IPlayer *> playerSteamIDs,
             std::function<void (std::vector<Match> matches)> onResult,
             ErrorCallback onError) = 0;
 
         virtual void registerPlugin(
             uint64_t matchId,
-            SteamID starter,
-            std::string address,
-            std::string password,
-            std::string rconPassword,
-            std::vector<SteamID> team1,
-            std::vector<SteamID> team2,
+            IPlayer *starter,
+            int port,
+            std::string_view password,
+            std::vector<IPlayer *> team1,
+            std::vector<IPlayer *> team2,
             std::function<void (std::string registrationToken, std::string confirmationURL)> onResult,
             ErrorCallback onError) = 0;
 
