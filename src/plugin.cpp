@@ -95,6 +95,16 @@ namespace {
 
     // TODO: Maybe add a single recipient filter
 
+    struct FNEventListener : IGameEventListener2 {
+        std::function<void (IGameEvent *event)> callback;
+
+        FNEventListener(std::function<void (IGameEvent *event)> && c) : callback(c) {}
+
+        void FireGameEvent(IGameEvent *event) override {
+            callback(event);
+        }
+    };
+
     // TODO: Cache results?
     int getMessageType(const char * messageName) {
         char name[255];
@@ -149,6 +159,16 @@ namespace {
         }
 
         engine->MessageEnd();
+    }
+
+    Team teamIndexToTeam(int team_index) {
+        if (team_index == 2) {
+            return Team::team1;
+        } else if (team_index == 3) {
+            return Team::team2;
+        } else {
+            return Team::other;
+        }
     }
 }
 
@@ -217,14 +237,7 @@ class CitadelAutoMatchPlugin : public ISmmPlugin, public IMetamodListener, publi
         SteamID getSteamID() const override { return steam_id; }
 
         Team getTeam() const override {
-            auto team_index = info->GetTeamIndex();
-            if (team_index == 2) {
-                return Team::team1;
-            } else if (team_index == 3) {
-                return Team::team2;
-            } else {
-                return Team::other;
-            }
+            return teamIndexToTeam(info->GetTeamIndex());
         }
 
         void notify(const std::string_view message) override {
@@ -282,7 +295,17 @@ class CitadelAutoMatchPlugin : public ISmmPlugin, public IMetamodListener, publi
     int player_count = 0;
     ConnectedPlayers connected_players;
 
-    CitadelAutoMatchPlugin() {
+    // Event listeners
+    FNEventListener on_teamplay_round_win;
+    FNEventListener on_teamplay_game_over;
+    FNEventListener on_tf_game_over;
+    FNEventListener on_player_death;
+
+    CitadelAutoMatchPlugin()
+            : on_teamplay_round_win([=](IGameEvent *e) { onRoundWin(e); })
+            , on_teamplay_game_over([=](IGameEvent *e) { onGameOver(e); })
+            , on_tf_game_over([=](IGameEvent *e) { onGameOver(e); })
+            , on_player_death([=](IGameEvent *e) { onPlayerDeath(e); }) {
         for (int i = 0; i < MAX_PLAYERS; i++) {
             connected_players[i] = Player(i);
         }
@@ -398,6 +421,12 @@ public:
         icvar->RegisterConCommand(&cas_confirmation_complete);
         icvar->RegisterConCommand(&cas_confirmation_progress);
 
+        // Hook events
+        gameevents->AddListener(&on_teamplay_round_win, "teamplay_round_win", true);
+        gameevents->AddListener(&on_teamplay_game_over, "teamplay_game_over", true);
+        gameevents->AddListener(&on_tf_game_over, "tf_game_over", true);
+        gameevents->AddListener(&on_player_death, "player_death", true);
+
         META_LOG(g_PLAPI, "CitadelAutoMatchPlugin loaded\n");
         Warning("Yo, Merry Christmas\n");
 
@@ -419,6 +448,11 @@ public:
         icvar->UnregisterConCommand(&cas_confirmation_complete);
         icvar->UnregisterConCommand(&cas_confirmation_progress);
 
+        gameevents->RemoveListener(&on_teamplay_round_win);
+        gameevents->RemoveListener(&on_teamplay_game_over);
+        gameevents->RemoveListener(&on_tf_game_over);
+        gameevents->RemoveListener(&on_player_death);
+
         if (vsp_callbacks) {
             SH_REMOVE_HOOK_MEMFUNC(IServerPluginCallbacks, OnQueryCvarValueFinished, vsp_callbacks, this, &CitadelAutoMatchPlugin::onQueryCvarValueFinished, false);
         }
@@ -436,7 +470,12 @@ public:
     }
 
     // Source Hooks
-    void onClientCommand(edict_t *pEntity, const CCommand& args) {}
+    void onClientCommand(edict_t *edict, const CCommand& args) {
+        auto& player = getPlayer(edict);
+        if (!player.isValid()) return;
+
+        printf("%s: %s %s\n", player.getName().data(), args.Arg(0), args.ArgS());
+    }
 
     void onSetCommandClient(int client_index) {
         printf("Pre-command client %d\n", client_index);
@@ -514,6 +553,31 @@ public:
         }
     }
 
+    // Event Listeners
+    void onRoundWin(IGameEvent *event) {
+        if (!active_match) return;
+
+        int team_index = event->GetInt("team", -1);
+        sassert(team_index != -1, "Invalid team");
+
+        active_match->onRoundWin(teamIndexToTeam(team_index));
+    }
+
+    void onGameOver(IGameEvent *event) {
+        if (!active_match) return;
+
+        const char *reason = event->GetString("reason", nullptr);
+        if (reason != nullptr) {
+            printf("Game Over: %s\n", reason);
+        }
+
+        active_match->onMapComplete();
+    }
+
+    void onPlayerDeath(IGameEvent *event) {
+        printf("Player died!\n");
+    }
+
     // IGame
     int serverPort() const override {
         return iserver->GetUDPPort();
@@ -552,7 +616,7 @@ public:
             match_picker = nullptr;
         }
 
-        notifyAll("Match has been reset.");
+        // notifyAll("Match has been reset.");
     }
 
     void notifyAll(const std::string_view message) override {
@@ -575,7 +639,7 @@ public:
         sassert(0 <= id && id < MAX_PLAYERS, "Player ID out of range");
 
         auto& p = connected_players[id - 1];
-        sassert(p.isValid(), "Player not valid");
+        // sassert(p.isValid(), "Player not valid");
         return p;
     }
 
@@ -643,7 +707,6 @@ static void onConfirmationProgress(const CCommand &args) {
 }
 
 ConCommand cas_confirmation_progress("cas_confirmation_progress", onConfirmationProgress , "", 0);
-
 
 // Set up metamod plugin
 PLUGIN_EXPOSE(CitadelAutoMatchPlugin, CitadelAutoMatchPlugin::instance());

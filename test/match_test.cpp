@@ -6,7 +6,7 @@
 
 #include "mocks.h"
 
-citadel::Match match_details(34, citadel::Roster(1, "foo"), citadel::Roster(2, "bar"));
+citadel::Match match_details(34, citadel::Roster(1, "foo"), citadel::Roster(2, "bar"), {});
 
 TEST_CASE("Match") {
     SECTION("::start") {

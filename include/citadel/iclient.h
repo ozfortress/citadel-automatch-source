@@ -17,12 +17,22 @@ namespace citadel {
         Roster(uint64_t i, std::string n) : id(i), name(n) {}
     };
 
+    struct Round {
+        uint64_t id;
+        std::string map;
+        int32_t homeTeamScore = 0;
+        int32_t awayTeamScore = 0;
+
+        Round(uint64_t i, std::string && m, int32_t h, int32_t a) : id(i), map(m), homeTeamScore(h), awayTeamScore(a) {}
+    };
+
     struct Match {
         uint64_t id;
         Roster homeTeam;
         Roster awayTeam;
+        std::vector<Round> rounds;
 
-        Match(uint64_t i, Roster h, Roster a) : id(i), homeTeam(h), awayTeam(a) {}
+        Match(uint64_t i, Roster h, Roster a, std::vector<Round> && r) : id(i), homeTeam(h), awayTeam(a), rounds(r) {}
     };
 
     class IClient {
@@ -52,15 +62,20 @@ namespace citadel {
             ErrorCallback onError) = 0;
 
         struct MatchResult {
-            double homeTeamScore;
-            double awayTeamScore;
+            std::vector<Round> rounds;
             std::string pluginLogs;
 
-            MatchResult(double h, double a, std::string l)
-                : homeTeamScore(h)
-                , awayTeamScore(a)
+            MatchResult(std::vector<Round> r, std::string l)
+                : rounds(r)
                 , pluginLogs(l) {}
         };
+
+        virtual void updateMatch(
+            uint64_t matchId,
+            std::string matchToken,
+            MatchResult result,
+            std::function<void ()> onResult,
+            ErrorCallback onError) = 0;
 
         virtual void submitMatch(
             uint64_t matchId,

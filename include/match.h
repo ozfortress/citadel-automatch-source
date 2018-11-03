@@ -40,12 +40,14 @@ private:
     std::shared_ptr<citadel::IClient> citadel;
     citadel::Match matchInfo;
 
+    // TODO: Properly calculate these
+    Team homeTeam = Team::team1;
+    Team awayTeam = Team::team2;
+
     void log(std::string);
     std::string getLogs();
 
     void onPlayerConfirm(std::string &, IPlayer *);
-
-    void onMatchComplete(uint32_t homeTeamScore, uint32_t awayTeamScore);
 
 public:
     State state = Initializing();
@@ -59,4 +61,7 @@ public:
 
     void onServerConfirm();
     void onServerConfirmationProgress();
+
+    void onRoundWin(Team winner);
+    void onMapComplete();
 };

@@ -34,6 +34,15 @@ namespace citadel {
                         auto& homeTeam = match["home_team"];
                         auto& awayTeam = match["away_team"];
 
+                        auto& roundsJson = match["rounds"];
+                        sassert(roundsJson.IsArray(), "Wrong json type");
+                        std::vector<Round> rounds;
+                        for (size_t j = 0; j < roundsJson.Size(); j++) {
+                            auto& round = roundsJson[j];
+                            rounds.push_back(
+                                Round(round["id"].GetUint64(), "", 0, 0));
+                        }
+
                         result.push_back(
                             Match(
                                 match["id"].GetUint64(),
@@ -42,7 +51,8 @@ namespace citadel {
                                     homeTeam["name"].GetString()),
                                 Roster(
                                     awayTeam["id"].GetUint64(),
-                                    awayTeam["name"].GetString())));
+                                    awayTeam["name"].GetString()),
+                                std::move(rounds)));
                     }
                     onResult(result);
                 } else if (res.json.HasMember("errors")) {
@@ -127,12 +137,73 @@ namespace citadel {
             });
     }
 
+    static void setResultParams(const IClient::MatchResult & result, std::vector<std::pair<std::string, std::string>> * params) {
+        for (size_t i = 0; i < result.rounds.size(); i++) {
+            auto& round = result.rounds[i];
+            std::string r("match[rounds_attributes][" + std::to_string(i) + "]");
+
+            params->push_back(std::pair(r + "[id]", std::to_string(round.id)));
+            params->push_back(std::pair(r + "[home_team_score]", std::to_string(round.homeTeamScore)));
+            params->push_back(std::pair(r + "[away_team_score]", std::to_string(round.awayTeamScore)));
+        }
+        // TODO: Logs, etc.
+    }
+
+    void Client::updateMatch(
+            uint64_t matchId,
+            std::string matchToken,
+            MatchResult result,
+            std::function<void ()> onResult,
+            ErrorCallback onError) {
+
+        std::string url = endpoint + "/api/v1/auto_match/update";
+
+        std::vector<std::pair<std::string, std::string>> params;
+        params.push_back(std::pair("id", std::to_string(matchId)));
+        params.push_back(std::pair("token", matchToken));
+        setResultParams(result, &params);
+        Requests::Request req(Requests::Method::POST, url, params);
+
+        requests->request(req,
+            [=](const Requests::Response& res) {
+                if (res.json.HasMember("errors")) {
+                    onError(res.code, res.json["errors"][0].GetString());
+                    return;
+                }
+
+                onResult();
+            },
+            [=](const std::string& msg) {
+                onError(0, msg);
+            });
+    }
+
     void Client::submitMatch(
             uint64_t matchId,
             std::string matchToken,
             MatchResult result,
             std::function<void ()> onResult,
             ErrorCallback onError) {
-        // TODO
+
+        std::string url = endpoint + "/api/v1/auto_match/submit";
+
+        std::vector<std::pair<std::string, std::string>> params;
+        params.push_back(std::pair("id", std::to_string(matchId)));
+        params.push_back(std::pair("token", matchToken));
+        setResultParams(result, &params);
+        Requests::Request req(Requests::Method::POST, url, params);
+
+        requests->request(req,
+            [=](const Requests::Response& res) {
+                if (res.json.HasMember("errors")) {
+                    onError(res.code, res.json["errors"][0].GetString());
+                    return;
+                }
+
+                onResult();
+            },
+            [=](const std::string& msg) {
+                onError(0, msg);
+            });
     }
 }

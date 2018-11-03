@@ -1,8 +1,9 @@
 #include "match.h"
 #include "utils.h"
 
-#include <sstream>
+#include <inttypes.h>
 #include <iterator>
+#include <sstream>
 #include <time.h>
 
 #include "utils.h"
@@ -38,31 +39,16 @@ void Match::onPlayerConfirm(std::string& confirmationURL, IPlayer *player) {
     player->openMOTD("AutoMatch Confirmation", confirmationURL);
 }
 
-void Match::onMatchComplete(uint32_t homeTeamScore, uint32_t awayTeamScore) {
-    auto running = std::get_if<Running>(&state);
-    sassert(running != nullptr, "Invalid state");
-
-    auto result = citadel::IClient::MatchResult(homeTeamScore, awayTeamScore, getLogs());
-
-    citadel->submitMatch(
-        matchInfo.id,
-        running->matchToken,
-        result,
-        [=]() {
-            // TODO: Kill match
-            game->notifyAllError(format("Submitted match result."));
-        },
-        [=](int32_t code, std::string error) {
-            // TODO: Retry
-            game->notifyAllError(format("Failed to submit match. Get error %d with message '%s'", code, error.c_str()));
-        }
-    );
-}
-
 void Match::start(IPlayer *starter) {
     printf("Registering plugin (%d, %d)\n", game == nullptr, citadel == nullptr);
 
     game->notifyAll(format("Starting match %s vs %s", matchInfo.homeTeam.name.c_str(), matchInfo.awayTeam.name.c_str()));
+
+    if (matchInfo.rounds.size() == 0) {
+        game->notifyAllError("Failed to start match. No available rounds.");
+        game->resetMatch();
+        return;
+    }
 
     state = Initializing();
 
@@ -104,13 +90,7 @@ bool Match::onCommand(IPlayer *player, std::string line) {
                 game->resetMatch();
             }
         },
-        [&](Running& value) {
-            if (line == "complete") {
-                onMatchComplete(1, 0);
-
-                handled = true;
-            }
-        },
+        [&](Running& value) {},
     }, state);
 
     return handled;
@@ -135,11 +115,6 @@ void Match::onServerConfirm() {
             game->notifyAll("Good luck and have fun!"); // TODO: Actual match management
         },
         [=](int32_t code, std::string error) {
-            // if (code == 400) {
-            //     game->notifyAllError("")
-            //     return;
-            // }
-
             game->notifyAllError(format("Failed to register plugin for match. Got error %d with message '%s'", code, error.c_str()));
             game->resetMatch();
         }
@@ -154,4 +129,61 @@ void Match::onServerConfirmationProgress() {
 
     // TODO: Request status update
     game->notifyAll("Registration has progressed\n");
+}
+
+void Match::onRoundWin(Team team) {
+    auto running = std::get_if<Running>(&state);
+    if (running == nullptr) return;
+
+    sassert(team != Team::other, "Invalid round win team");
+
+    if (team == homeTeam)
+    {
+        matchInfo.rounds[0].homeTeamScore++;
+    }
+    else
+    {
+        sassert(team == awayTeam, "Invalid round win team");
+        matchInfo.rounds[0].awayTeamScore++;
+    }
+
+    game->notifyAll(format("Round was won: %" PRId32 " to %" PRId32 "\n", matchInfo.rounds[0].homeTeamScore, matchInfo.rounds[0].awayTeamScore));
+
+    auto result = citadel::IClient::MatchResult(matchInfo.rounds, getLogs());
+
+    citadel->updateMatch(
+        matchInfo.id,
+        running->matchToken,
+        result,
+        [=]() {
+            game->notifyAll("Updated match results.");
+        },
+        [=](int32_t code, std::string error) {
+            game->notifyAllError(format("Failed to send match update. Got error %d with message '%s'", code, error.c_str()));
+        }
+    );
+}
+
+void Match::onMapComplete() {
+    auto running = std::get_if<Running>(&state);
+    if (running == nullptr) return;
+
+    game->notifyAll("Map Complete.");
+
+    auto result = citadel::IClient::MatchResult(matchInfo.rounds, getLogs());
+
+    citadel->submitMatch(
+        matchInfo.id,
+        running->matchToken,
+        result,
+        [=]() {
+            game->notifyAll("Submitted match result.");
+            game->resetMatch();
+        },
+        [=](int32_t code, std::string error) {
+            game->notifyAllError(format("Failed to submit match. Got error %d with message '%s'", code, error.c_str()));
+            // TODO: Retry
+            game->resetMatch();
+        }
+    );
 }

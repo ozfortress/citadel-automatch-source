@@ -30,6 +30,13 @@ namespace mocks {
             std::function<void (std::string matchToken)> onResult,
             ErrorCallback onError) override {}
 
+        void updateMatch(
+            uint64_t matchId,
+            std::string matchToken,
+            MatchResult result,
+            std::function<void ()> onResult,
+            ErrorCallback onError) override {}
+
         void submitMatch(
             uint64_t matchId,
             std::string matchToken,
